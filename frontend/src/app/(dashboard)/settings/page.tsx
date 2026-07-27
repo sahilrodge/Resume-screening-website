@@ -70,7 +70,9 @@ export default function SettingsPage() {
       await navigator.serviceWorker.ready
       const sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(prefs.vapid_public_key),
+        applicationServerKey: urlBase64ToUint8Array(
+  prefs.vapid_public_key
+) as BufferSource,
       })
       const json = sub.toJSON()
       if (!json.endpoint || !json.keys?.p256dh || !json.keys?.auth) {
