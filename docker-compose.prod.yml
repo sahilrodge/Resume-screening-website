@@ -1,0 +1,22 @@
+# Production overrides — use with:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile full up -d --build
+services:
+  db:
+    ports: []  # do not expose Postgres publicly in production compose
+
+  backend:
+    environment:
+      APP_ENV: production
+      DEBUG: "false"
+      LOG_FORMAT: json
+      LOG_LEVEL: INFO
+      WEB_CONCURRENCY: "2"
+      # Override these via host env or a secrets file in CI:
+      # SECRET_KEY, DATABASE_URL, CORS_ORIGINS, OPENAI_API_KEY, etc.
+
+  frontend:
+    profiles: []
+    build:
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+        NEXT_PUBLIC_APP_NAME: ${NEXT_PUBLIC_APP_NAME:-HirePulse}

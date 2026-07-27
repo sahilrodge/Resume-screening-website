@@ -1,0 +1,3 @@
+# Fallback if not using Dockerfile builder
+web: ./scripts/entrypoint.sh
+release: alembic upgrade head

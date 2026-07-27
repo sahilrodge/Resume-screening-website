@@ -1,0 +1,16 @@
+# Nixpacks fallback (when Railway builder is not Dockerfile)
+providers = ["python"]
+
+[phases.setup]
+nixPkgs = ["python312", "postgresql"]
+
+[phases.install]
+cmds = ["pip install -r requirements.txt"]
+
+[start]
+cmd = "./scripts/entrypoint.sh"
+
+[variables]
+APP_ENV = "production"
+LOG_FORMAT = "json"
+PYTHONUNBUFFERED = "1"

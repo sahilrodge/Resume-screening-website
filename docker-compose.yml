@@ -1,0 +1,76 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: recruitment_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: recruitment_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d recruitment_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: recruitment_api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      APP_ENV: production
+      DEBUG: "false"
+      LOG_FORMAT: json
+      LOG_LEVEL: INFO
+      PORT: "8000"
+      WEB_CONCURRENCY: "2"
+      RUN_MIGRATIONS: "true"
+      # Override in real deployments — local compose default only
+      SECRET_KEY: ${SECRET_KEY:-local-dev-only-change-me-to-a-long-random-secret-key}
+      DATABASE_URL: postgresql+psycopg2://postgres:postgres@db:5432/recruitment_db
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:-}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:-}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:-}
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/api/v1/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1
+        NEXT_PUBLIC_APP_NAME: HirePulse
+    container_name: recruitment_web
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      PORT: "3000"
+      HOSTNAME: 0.0.0.0
+    ports:
+      - "3000:3000"
+    profiles:
+      - full
+
+volumes:
+  postgres_data:

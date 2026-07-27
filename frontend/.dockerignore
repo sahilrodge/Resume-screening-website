@@ -1,0 +1,12 @@
+.git
+.gitignore
+.env
+.env.*
+!.env.local.example
+node_modules
+.next
+out
+coverage
+README.md
+.DS_Store
+*.log
