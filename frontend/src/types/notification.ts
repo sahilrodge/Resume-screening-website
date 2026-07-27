@@ -1,10 +1,5 @@
 export type NotificationType = "info" | "success" | "warning" | "alert"
-export type NotificationChannel =
-  | "in_app"
-  | "email"
-  | "whatsapp"
-  | "sms"
-  | "push"
+export type NotificationChannel = "in_app" | "email" | "sms" | "push"
 export type NotificationDeliveryStatus =
   | "pending"
   | "sent"
@@ -43,7 +38,6 @@ export type UnreadCountResponse = {
 
 export type NotificationPreferences = {
   email_enabled: boolean
-  whatsapp_enabled: boolean
   in_app_enabled: boolean
   push_enabled: boolean
   vapid_public_key: string | null
@@ -53,7 +47,6 @@ export type NotificationPreferences = {
 
 export type NotificationPreferenceUpdate = {
   email_enabled?: boolean
-  whatsapp_enabled?: boolean
   in_app_enabled?: boolean
   push_enabled?: boolean
 }

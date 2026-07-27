@@ -55,13 +55,43 @@ def upload_pdf(
     }
 
 
-def delete_asset(public_id: str) -> None:
+def upload_image(
+    *,
+    file_bytes: bytes,
+    user_id: uuid.UUID,
+    folder: str = "hirepulse/avatars",
+) -> dict[str, Any]:
+    """Upload a profile image to Cloudinary. Returns public_id + secure_url."""
+    _configure_cloudinary()
+
+    public_id = f"{folder}/{user_id}/{uuid.uuid4().hex}"
+    result = cloudinary.uploader.upload(
+        file_bytes,
+        resource_type="image",
+        public_id=public_id,
+        overwrite=True,
+        folder=None,
+        transformation=[
+            {"width": 400, "height": 400, "crop": "fill", "gravity": "face"},
+            {"quality": "auto", "fetch_format": "auto"},
+        ],
+    )
+    return {
+        "public_id": result.get("public_id") or public_id,
+        "secure_url": result["secure_url"],
+        "bytes": result.get("bytes"),
+        "format": result.get("format"),
+        "resource_type": result.get("resource_type") or "image",
+    }
+
+
+def delete_asset(public_id: str, *, resource_type: str = "raw") -> None:
     """Best-effort delete from Cloudinary."""
     if not settings.cloudinary_configured or not public_id:
         return
     _configure_cloudinary()
     try:
-        cloudinary.uploader.destroy(public_id, resource_type="raw")
+        cloudinary.uploader.destroy(public_id, resource_type=resource_type)
     except Exception:
         # Non-fatal — DB row may still be removed
         pass

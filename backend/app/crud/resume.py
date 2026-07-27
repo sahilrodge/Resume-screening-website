@@ -126,6 +126,21 @@ class CRUDResume:
         )
         return db.scalars(stmt).unique().first()
 
+    def get_primary_or_latest(
+        self,
+        db: Session,
+        *,
+        candidate_id: uuid.UUID,
+    ) -> Resume | None:
+        stmt = (
+            select(Resume)
+            .options(joinedload(Resume.candidate).joinedload(Candidate.user))
+            .where(Resume.candidate_id == candidate_id)
+            .order_by(Resume.is_primary.desc(), Resume.created_at.desc())
+            .limit(1)
+        )
+        return db.scalars(stmt).unique().first()
+
     def delete(self, db: Session, *, db_obj: Resume) -> None:
         db.delete(db_obj)
         db.commit()

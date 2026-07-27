@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.security import hash_password
+from app.models.enums import UserRole
 from app.models.user import User
 from app.schemas.user import UserCreate
 
@@ -30,6 +31,29 @@ class CRUDUser:
         db.commit()
         db.refresh(user)
         return user
+
+    def update(
+        self,
+        db: Session,
+        *,
+        db_obj: User,
+        full_name: str | None = None,
+        role: UserRole | None = None,
+        is_active: bool | None = None,
+        password: str | None = None,
+    ) -> User:
+        if full_name is not None:
+            db_obj.full_name = full_name.strip()
+        if role is not None:
+            db_obj.role = role
+        if is_active is not None:
+            db_obj.is_active = is_active
+        if password is not None:
+            db_obj.hashed_password = hash_password(password)
+        db.add(db_obj)
+        db.commit()
+        db.refresh(db_obj)
+        return db_obj
 
 
 user = CRUDUser()

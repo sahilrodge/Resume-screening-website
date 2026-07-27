@@ -8,9 +8,10 @@ from typing import Annotated
 from fastapi import APIRouter, File, Form, Query, UploadFile, status
 from fastapi.responses import RedirectResponse
 
-from app.api.deps import DBSession, RecruiterUser
+from app.api.deps import CandidateUser, DBSession, RecruiterUser
 from app.schemas.common import MessageResponse
 from app.schemas.resume import ResumeListResponse, ResumePreviewResponse, ResumeResponse
+from app.services.candidate import candidate_service
 from app.services.resume import resume_service
 
 router = APIRouter(prefix="/resumes", tags=["resumes"])
@@ -34,6 +35,47 @@ async def upload_resume(
         candidate_id=candidate_id,
         file=file,
         is_primary=is_primary,
+    )
+
+
+@router.post(
+    "/me/upload",
+    response_model=ResumeResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Candidate upload own resume",
+)
+async def upload_my_resume(
+    db: DBSession,
+    current_user: CandidateUser,
+    file: Annotated[UploadFile, File(..., description="PDF file")],
+    is_primary: Annotated[bool, Form()] = True,
+) -> ResumeResponse:
+    me = candidate_service.get_by_user_id(db, current_user.id)
+    return await resume_service.upload(
+        db,
+        candidate_id=me.id,
+        file=file,
+        is_primary=is_primary,
+    )
+
+
+@router.get(
+    "/me",
+    response_model=ResumeListResponse,
+    summary="List resumes for the authenticated candidate",
+)
+def list_my_resumes(
+    db: DBSession,
+    current_user: CandidateUser,
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=100)] = 20,
+) -> ResumeListResponse:
+    me = candidate_service.get_by_user_id(db, current_user.id)
+    return resume_service.list(
+        db,
+        candidate_id=me.id,
+        page=page,
+        page_size=page_size,
     )
 
 

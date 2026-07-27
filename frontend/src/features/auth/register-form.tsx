@@ -5,13 +5,11 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 
 import { useAuth } from "@/features/auth/auth-provider"
+import { homeForRole } from "@/lib/auth-roles"
 import { ApiError } from "@/types/api"
-import type { UserRole } from "@/types/auth"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-
-const roles: UserRole[] = ["candidate", "recruiter", "admin"]
 
 export function RegisterForm() {
   const router = useRouter()
@@ -19,7 +17,6 @@ export function RegisterForm() {
   const [fullName, setFullName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [role, setRole] = useState<UserRole>("candidate")
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
@@ -28,13 +25,13 @@ export function RegisterForm() {
     setError(null)
     setSubmitting(true)
     try {
-      await register({
+      const data = await register({
         email,
         password,
         full_name: fullName,
-        role,
+        role: "candidate",
       })
-      router.replace("/dashboard")
+      router.replace(homeForRole(data.user.role))
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Registration failed")
     } finally {
@@ -82,21 +79,10 @@ export function RegisterForm() {
         />
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="role">Role</Label>
-        <select
-          id="role"
-          value={role}
-          onChange={(e) => setRole(e.target.value as UserRole)}
-          className="flex h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-        >
-          {roles.map((item) => (
-            <option key={item} value={item}>
-              {item.charAt(0).toUpperCase() + item.slice(1)}
-            </option>
-          ))}
-        </select>
-      </div>
+      <p className="text-xs text-muted-foreground">
+        Public registration creates a candidate account. Recruiter and admin
+        accounts are provisioned by an administrator.
+      </p>
 
       {error ? (
         <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">

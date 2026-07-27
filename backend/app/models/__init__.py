@@ -18,9 +18,6 @@ from app.models.enums import (
     ResumeStatus,
     SkillLevel,
     UserRole,
-    VoiceCallStatus,
-    WhatsappDirection,
-    WhatsappStatus,
 )
 from app.models.interview import Interview
 from app.models.job import Job
@@ -33,8 +30,6 @@ from app.models.refresh_token import RefreshToken
 from app.models.resume import Resume
 from app.models.skill import CandidateSkill, JobSkill, Skill
 from app.models.user import User
-from app.models.voice_call import VoiceCall
-from app.models.whatsapp_log import WhatsappLog
 
 __all__ = [
     "Base",
@@ -51,8 +46,6 @@ __all__ = [
     "JobSkill",
     "Interview",
     "Resume",
-    "WhatsappLog",
-    "VoiceCall",
     "Notification",
     "NotificationPreference",
     "PushSubscription",
@@ -67,9 +60,6 @@ __all__ = [
     "NotificationType",
     "NotificationChannel",
     "NotificationDeliveryStatus",
-    "WhatsappDirection",
-    "WhatsappStatus",
-    "VoiceCallStatus",
     "ChatRole",
     "SkillLevel",
     "TimestampMixin",

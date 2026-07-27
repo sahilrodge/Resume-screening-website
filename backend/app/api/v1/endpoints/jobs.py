@@ -7,7 +7,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Query, status
 
-from app.api.deps import DBSession, RecruiterUser
+from app.api.deps import CurrentUser, DBSession, RecruiterUser
 from app.models.enums import EmploymentType, JobStatus
 from app.schemas.common import MessageResponse
 from app.schemas.job import (
@@ -81,6 +81,31 @@ def list_jobs(
         recruiter_id=recruiter_id,
         sort_by=sort_by,
         sort_order=sort_order,
+    )
+
+
+@router.get(
+    "/open",
+    response_model=JobListResponse,
+    summary="List open jobs (any authenticated role)",
+)
+def list_open_jobs(
+    db: DBSession,
+    _: CurrentUser,
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=100)] = 20,
+    search: Annotated[str | None, Query(max_length=120)] = None,
+    location: Annotated[str | None, Query(max_length=120)] = None,
+) -> JobListResponse:
+    return job_service.list(
+        db,
+        page=page,
+        page_size=page_size,
+        search=search,
+        status=JobStatus.OPEN,
+        location=location,
+        sort_by="created_at",
+        sort_order="desc",
     )
 
 

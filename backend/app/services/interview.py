@@ -1,4 +1,4 @@
-"""Interview business logic with WhatsApp invite auto-send."""
+"""Interview business logic."""
 
 from __future__ import annotations
 
@@ -11,10 +11,13 @@ from app.crud.application import application as application_crud
 from app.crud.interview import interview as interview_crud
 from app.models.enums import ApplicationStatus, NotificationType
 from app.models.interview import Interview
-from app.schemas.interview import InterviewCreate, InterviewListResponse, InterviewResponse
+from app.schemas.interview import (
+    InterviewCreate,
+    InterviewListResponse,
+    InterviewResponse,
+    InterviewStatusUpdate,
+)
 from app.services.notification import notification_service
-from app.services.whatsapp import whatsapp_service
-from app.services.whatsapp_templates import WhatsappEvent
 
 
 def _to_response(obj: Interview) -> InterviewResponse:
@@ -65,23 +68,12 @@ class InterviewService:
             location=data.location,
         )
 
-        # Move application into interview status
         application_crud.update_status(
             db,
             db_obj=application,
             status=ApplicationStatus.INTERVIEW,
         )
-        # Refresh with relationships
         created = interview_crud.get(db, created.id)
-
-        if data.send_whatsapp and created and created.application:
-            whatsapp_service.notify_application_event(
-                db,
-                application=created.application,
-                event=WhatsappEvent.INTERVIEW_INVITE,
-                interview=created,
-                allow_missing_twilio=True,
-            )
 
         if created and created.application:
             candidate_label = (
@@ -97,11 +89,10 @@ class InterviewService:
                 title="Interview scheduled",
                 message=f"{candidate_label} · {job_label} · {when}",
                 notification_type=NotificationType.SUCCESS,
-                event=WhatsappEvent.INTERVIEW_INVITE.value,
+                event="interview_invite",
                 interview=created,
                 link=f"/screening/{created.application_id}",
                 notify_candidate=True,
-                include_whatsapp_history=True,
             )
 
         assert created is not None
@@ -128,6 +119,19 @@ class InterviewService:
         if obj is None:
             raise NotFoundError("Interview not found")
         return _to_response(obj)
+
+    def update_status(
+        self,
+        db: Session,
+        interview_id: uuid.UUID,
+        *,
+        data: InterviewStatusUpdate,
+    ) -> InterviewResponse:
+        obj = interview_crud.get(db, interview_id)
+        if obj is None:
+            raise NotFoundError("Interview not found")
+        updated = interview_crud.update_status(db, db_obj=obj, status=data.status)
+        return _to_response(updated)
 
 
 interview_service = InterviewService()

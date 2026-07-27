@@ -7,7 +7,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Query, status
 
-from app.api.deps import DBSession, RecruiterUser
+from app.api.deps import CurrentUser, DBSession
 from app.schemas.assistant import (
     ChatReplyResponse,
     ConversationCreate,
@@ -29,7 +29,7 @@ router = APIRouter(prefix="/assistant", tags=["assistant"])
 def create_conversation(
     payload: ConversationCreate,
     db: DBSession,
-    user: RecruiterUser,
+    user: CurrentUser,
 ) -> ConversationResponse:
     return assistant_service.create_conversation(db, user=user, data=payload)
 
@@ -41,7 +41,7 @@ def create_conversation(
 )
 def list_conversations(
     db: DBSession,
-    user: RecruiterUser,
+    user: CurrentUser,
     page: Annotated[int, Query(ge=1)] = 1,
     page_size: Annotated[int, Query(ge=1, le=100)] = 30,
 ) -> ConversationListResponse:
@@ -56,9 +56,9 @@ def list_conversations(
 def get_conversation(
     conversation_id: uuid.UUID,
     db: DBSession,
-    _: RecruiterUser,
+    user: CurrentUser,
 ) -> ConversationResponse:
-    return assistant_service.get_conversation(db, conversation_id)
+    return assistant_service.get_conversation(db, conversation_id, user=user)
 
 
 @router.post(
@@ -70,6 +70,8 @@ def send_message(
     conversation_id: uuid.UUID,
     payload: MessageCreate,
     db: DBSession,
-    _: RecruiterUser,
+    user: CurrentUser,
 ) -> ChatReplyResponse:
-    return assistant_service.send_message(db, conversation_id=conversation_id, data=payload)
+    return assistant_service.send_message(
+        db, conversation_id=conversation_id, data=payload, user=user
+    )

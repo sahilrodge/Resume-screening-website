@@ -25,7 +25,6 @@ class JobCreate(BaseModel):
     experience_min_years: int | None = Field(default=None, ge=0, le=80)
     experience_max_years: int | None = Field(default=None, ge=0, le=80)
     openings: int = Field(default=1, ge=1, le=1000)
-    screening_questions: list[str] = Field(default_factory=list)
 
     @field_validator("title")
     @classmethod
@@ -66,7 +65,6 @@ class JobUpdate(BaseModel):
     experience_min_years: int | None = Field(default=None, ge=0, le=80)
     experience_max_years: int | None = Field(default=None, ge=0, le=80)
     openings: int | None = Field(default=None, ge=1, le=1000)
-    screening_questions: list[str] | None = None
 
     @field_validator("title")
     @classmethod
@@ -85,6 +83,7 @@ class JobResponse(BaseModel):
     id: uuid.UUID
     company_id: uuid.UUID
     company_name: str | None = None
+    company_logo_url: str | None = None
     recruiter_id: uuid.UUID | None = None
     recruiter_name: str | None = None
     title: str
@@ -98,8 +97,8 @@ class JobResponse(BaseModel):
     experience_min_years: int | None = None
     experience_max_years: int | None = None
     openings: int
-    screening_questions: list[str] = Field(default_factory=list)
     application_count: int = 0
+    skills: list[str] = Field(default_factory=list)
     published_at: datetime | None = None
     closes_at: datetime | None = None
     created_at: datetime

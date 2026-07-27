@@ -19,7 +19,6 @@ if TYPE_CHECKING:
     from app.models.interview import Interview
     from app.models.job import Job
     from app.models.resume import Resume
-    from app.models.voice_call import VoiceCall
 
 
 class Application(Base, UUIDPrimaryKeyMixin, TimestampMixin):
@@ -58,8 +57,12 @@ class Application(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     )
     cover_letter: Mapped[str | None] = mapped_column(Text, nullable=True)
     match_score: Mapped[float | None] = mapped_column(Numeric(5, 2), nullable=True)
+    ats_score: Mapped[float | None] = mapped_column(Numeric(5, 2), nullable=True)
     matching_skills: Mapped[list[Any] | None] = mapped_column(JSONB, nullable=True)
     missing_skills: Mapped[list[Any] | None] = mapped_column(JSONB, nullable=True)
+    strengths: Mapped[list[Any] | None] = mapped_column(JSONB, nullable=True)
+    weaknesses: Mapped[list[Any] | None] = mapped_column(JSONB, nullable=True)
+    suggestions: Mapped[list[Any] | None] = mapped_column(JSONB, nullable=True)
     ai_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     reasoning: Mapped[str | None] = mapped_column(Text, nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -71,8 +74,4 @@ class Application(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         "Interview",
         back_populates="application",
         cascade="all, delete-orphan",
-    )
-    voice_calls: Mapped[list[VoiceCall]] = relationship(
-        "VoiceCall",
-        back_populates="application",
     )

@@ -44,4 +44,10 @@ export const jobsApi = {
   dashboardStats() {
     return apiClient.get<JobDashboardStats>("/jobs/dashboard-stats")
   },
+
+  listOpen(params: JobListParams = {}) {
+    return apiClient.get<JobListResponse>("/jobs/open", {
+      params: toQuery(params),
+    })
+  },
 }

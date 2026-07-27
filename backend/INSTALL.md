@@ -65,7 +65,7 @@ Edit `.env` and set at least:
 Optional (for later features):
 
 - `OPENAI_API_KEY`
-- Twilio / Cloudinary credentials (add when those features are wired up)
+- Cloudinary credentials (for resume PDF storage)
 
 ## 7. Verify installation
 
@@ -106,7 +106,6 @@ Then open:
 | pydantic / email-validator | Validation |
 | pydantic-settings | Settings from env |
 | openai | AI features |
-| twilio | SMS / messaging |
 | httpx | Async HTTP client |
 | aiofiles | Async file I/O |
 | python-multipart | File uploads |

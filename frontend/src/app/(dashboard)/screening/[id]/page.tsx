@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useParams } from "next/navigation"
 import { useCallback, useEffect, useState } from "react"
-import { ArrowLeft, CalendarPlus, CheckCircle2, PhoneCall, XCircle } from "lucide-react"
+import { ArrowLeft, CalendarPlus, CheckCircle2, Download, XCircle } from "lucide-react"
 
 import { StatusBadge } from "@/components/admin/status-badge"
 import { FadeIn, PageTransition } from "@/components/motion/page-transition"
@@ -16,18 +16,15 @@ import { MatchResultPanel } from "@/features/screening/match-result-panel"
 import { useApiLoading } from "@/hooks/use-api-loading"
 import { applicationsApi } from "@/services/applications"
 import { interviewsApi } from "@/services/interviews"
-import { voiceCallsApi } from "@/services/voice-calls"
 import { ApiError } from "@/types/api"
 import type { ApplicationMatch } from "@/types/application"
 import { APPLICATION_STATUS_LABELS } from "@/types/application"
-import type { VoiceCall } from "@/types/voice-call"
 
 export default function ScreeningDetailPage() {
   const params = useParams<{ id: string }>()
   const id = params.id
   const apiLoading = useApiLoading()
   const [result, setResult] = useState<ApplicationMatch | null>(null)
-  const [calls, setCalls] = useState<VoiceCall[]>([])
   const [error, setError] = useState<string | null>(null)
   const [note, setNote] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -37,12 +34,8 @@ export default function ScreeningDetailPage() {
   const load = useCallback(async () => {
     setError(null)
     try {
-      const [data, callData] = await Promise.all([
-        applicationsApi.get(id),
-        voiceCallsApi.list({ application_id: id, page: 1, page_size: 10 }),
-      ])
+      const data = await applicationsApi.get(id)
       setResult(data)
-      setCalls(callData.items)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to load match result")
     }
@@ -57,29 +50,11 @@ export default function ScreeningDetailPage() {
     setError(null)
     setNote(null)
     try {
-      const updated = await applicationsApi.updateStatus(id, {
-        status,
-        send_whatsapp: true,
-      })
+      const updated = await applicationsApi.updateStatus(id, { status })
       setResult(updated)
-      setNote(`Status set to ${label}. WhatsApp message queued/sent if Twilio is configured.`)
+      setNote(`Status set to ${label}.`)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Status update failed")
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  async function triggerVapiCall() {
-    setBusy(true)
-    setError(null)
-    setNote(null)
-    try {
-      await voiceCallsApi.trigger(id)
-      await load()
-      setNote("Vapi screening call initiated (requires candidate phone + Vapi credentials).")
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to start Vapi call")
     } finally {
       setBusy(false)
     }
@@ -99,12 +74,25 @@ export default function ScreeningDetailPage() {
         scheduled_at: new Date(interviewAt).toISOString(),
         meeting_link: meetingLink.trim() || undefined,
         interview_type: "video",
-        send_whatsapp: true,
       })
       await load()
-      setNote("Interview invite created and WhatsApp invite sent (if Twilio is configured).")
+      setNote("Interview scheduled. Notifications sent via email/in-app when configured.")
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to schedule interview")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function downloadReport() {
+    setBusy(true)
+    setError(null)
+    setNote(null)
+    try {
+      await applicationsApi.downloadReport(id)
+      setNote("Screening report downloaded.")
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Failed to download report")
     } finally {
       setBusy(false)
     }
@@ -118,16 +106,23 @@ export default function ScreeningDetailPage() {
             ? `${result.candidate_name ?? "Candidate"} vs ${result.job_title ?? "Job"}`
             : "Match details"
         }
-        description="Stored OpenAI screening result · WhatsApp actions below"
+        description="ATS score, job match, strengths, gaps, and actionable resume suggestions"
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Link href="/screening" className={buttonVariants({ variant: "outline" })}>
               <ArrowLeft className="size-4" />
               Back
             </Link>
-            <Link href="/whatsapp" className={buttonVariants({ variant: "outline" })}>
-              WhatsApp log
-            </Link>
+            {result ? (
+              <Button
+                variant="outline"
+                disabled={busy}
+                onClick={() => void downloadReport()}
+              >
+                <Download className="size-4" />
+                Download report
+              </Button>
+            ) : null}
             {result ? (
               <StatusBadge status={APPLICATION_STATUS_LABELS[result.status]} />
             ) : null}
@@ -160,9 +155,9 @@ export default function ScreeningDetailPage() {
 
           <FadeIn>
             <section className="space-y-4 rounded-2xl border border-border/70 bg-card/80 p-5">
-              <h2 className="font-heading text-base font-semibold">WhatsApp actions</h2>
+              <h2 className="font-heading text-base font-semibold">Actions</h2>
               <p className="text-sm text-muted-foreground">
-                Candidate must have a phone number. Messages are stored in the WhatsApp log.
+                Update status or schedule an interview for this candidate.
               </p>
 
               <div className="flex flex-wrap gap-2">
@@ -172,22 +167,14 @@ export default function ScreeningDetailPage() {
                   onClick={() => void updateStatus("rejected", "Rejected")}
                 >
                   <XCircle className="size-4" />
-                  Reject + notify
+                  Reject
                 </Button>
                 <Button
                   disabled={busy}
                   onClick={() => void updateStatus("hired", "Selected")}
                 >
                   <CheckCircle2 className="size-4" />
-                  Select + notify
-                </Button>
-                <Button
-                  variant="outline"
-                  disabled={busy}
-                  onClick={() => void triggerVapiCall()}
-                >
-                  <PhoneCall className="size-4" />
-                  Call with Vapi
+                  Select
                 </Button>
               </div>
 
@@ -213,50 +200,12 @@ export default function ScreeningDetailPage() {
                 <div className="flex items-end">
                   <Button disabled={busy} onClick={() => void inviteInterview()}>
                     <CalendarPlus className="size-4" />
-                    Invite via WhatsApp
+                    Schedule interview
                   </Button>
                 </div>
               </div>
             </section>
           </FadeIn>
-
-          {calls.length ? (
-            <FadeIn>
-              <section className="space-y-3 rounded-2xl border border-border/70 bg-card/80 p-5">
-                <h2 className="font-heading text-base font-semibold">Vapi screening calls</h2>
-                <ul className="divide-y divide-border/60">
-                  {calls.map((c) => (
-                    <li
-                      key={c.id}
-                      className="flex flex-wrap items-center justify-between gap-3 py-3"
-                    >
-                      <div>
-                        <p className="font-medium capitalize">{c.status.replaceAll("_", " ")}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {c.evaluation_summary
-                            ? `${c.evaluation_summary.slice(0, 90)}…`
-                            : c.transcript
-                              ? "Transcript ready"
-                              : "Waiting for completion"}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="font-heading text-lg font-semibold tabular-nums">
-                          {c.interview_score != null ? Math.round(c.interview_score) : "—"}
-                        </span>
-                        <Link
-                          href={`/voice-calls/${c.id}`}
-                          className={buttonVariants({ variant: "outline", size: "sm" })}
-                        >
-                          View
-                        </Link>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            </FadeIn>
-          ) : null}
         </>
       ) : null}
     </PageTransition>

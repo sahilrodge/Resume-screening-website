@@ -8,7 +8,12 @@ from typing import Annotated
 from fastapi import APIRouter, Query, status
 
 from app.api.deps import DBSession, RecruiterUser
-from app.schemas.interview import InterviewCreate, InterviewListResponse, InterviewResponse
+from app.schemas.interview import (
+    InterviewCreate,
+    InterviewListResponse,
+    InterviewResponse,
+    InterviewStatusUpdate,
+)
 from app.services.interview import interview_service
 
 router = APIRouter(prefix="/interviews", tags=["interviews"])
@@ -18,7 +23,7 @@ router = APIRouter(prefix="/interviews", tags=["interviews"])
     "",
     response_model=InterviewResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Schedule interview (sends WhatsApp invite)",
+    summary="Schedule interview",
 )
 def create_interview(
     payload: InterviewCreate,
@@ -59,3 +64,17 @@ def get_interview(
     _: RecruiterUser,
 ) -> InterviewResponse:
     return interview_service.get(db, interview_id)
+
+
+@router.patch(
+    "/{interview_id}/status",
+    response_model=InterviewResponse,
+    summary="Update interview status",
+)
+def update_interview_status(
+    interview_id: uuid.UUID,
+    payload: InterviewStatusUpdate,
+    db: DBSession,
+    _: RecruiterUser,
+) -> InterviewResponse:
+    return interview_service.update_status(db, interview_id, data=payload)

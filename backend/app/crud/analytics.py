@@ -15,12 +15,10 @@ from app.models.enums import (
     InterviewStatus,
     InterviewType,
     JobStatus,
-    VoiceCallStatus,
 )
 from app.models.interview import Interview
 from app.models.job import Job
 from app.models.recruiter import Recruiter
-from app.models.voice_call import VoiceCall
 
 FUNNEL_ORDER = [
     ApplicationStatus.APPLIED,
@@ -54,7 +52,6 @@ INTERVIEW_TYPE_LABELS = {
     InterviewType.PHONE: "Phone",
     InterviewType.VIDEO: "Video",
     InterviewType.ONSITE: "Onsite",
-    InterviewType.AI_VOICE: "AI voice",
 }
 
 MATCH_BUCKETS = [
@@ -257,6 +254,7 @@ class CRUDAnalytics:
                 items.append(
                     {
                         "recruiter_id": rec.id,
+                        "user_id": rec.user_id,
                         "name": rec.user.full_name if rec.user else "Unknown",
                         "jobs_owned": 0,
                         "open_jobs": int(open_jobs),
@@ -320,6 +318,7 @@ class CRUDAnalytics:
             items.append(
                 {
                     "recruiter_id": rec.id,
+                    "user_id": rec.user_id,
                     "name": rec.user.full_name if rec.user else "Unknown",
                     "jobs_owned": jobs_owned,
                     "open_jobs": int(open_jobs),
@@ -461,40 +460,12 @@ class CRUDAnalytics:
             {"rating": int(r.rating), "count": int(r.count)} for r in rating_rows
         ]
 
-        voice_completed = int(
-            db.scalar(
-                select(func.count())
-                .select_from(VoiceCall)
-                .where(VoiceCall.status == VoiceCallStatus.COMPLETED)
-            )
-            or 0
-        )
-        # Extract interview_score from JSONB meta when present
-        score_expr = cast(VoiceCall.meta["interview_score"].astext, Float)
-        avg_voice_score = db.scalar(
-            select(func.avg(score_expr)).where(
-                VoiceCall.status == VoiceCallStatus.COMPLETED,
-                VoiceCall.meta.isnot(None),
-                VoiceCall.meta["interview_score"].astext.isnot(None),
-            )
-        )
-        avg_duration = db.scalar(
-            select(func.avg(cast(VoiceCall.duration_seconds, Float))).where(
-                VoiceCall.duration_seconds.isnot(None)
-            )
-        )
-
         return {
             "by_status": by_status,
             "by_type": by_type,
             "avg_rating": round(float(avg_rating), 1) if avg_rating is not None else None,
             "rated_count": rated_count,
             "rating_distribution": rating_distribution,
-            "voice_completed": voice_completed,
-            "avg_voice_score": round(float(avg_voice_score), 1) if avg_voice_score is not None else None,
-            "avg_voice_duration_seconds": (
-                round(float(avg_duration), 0) if avg_duration is not None else None
-            ),
         }
 
     def _monthly_hiring(

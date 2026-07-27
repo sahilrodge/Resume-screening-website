@@ -93,7 +93,6 @@ def _build_context(db: Session, conversation: AssistantConversation) -> str:
         job = job_crud.get(db, conversation.job_id)
         if job:
             company = job.company.name if job.company else None
-            qs = job.screening_questions or []
             parts.append(
                 "FOCUSED JOB:\n"
                 f"id={job.id}\n"
@@ -104,8 +103,7 @@ def _build_context(db: Session, conversation: AssistantConversation) -> str:
                 f"status={job.status.value}\n"
                 f"experience={job.experience_min_years}-{job.experience_max_years} years\n"
                 f"salary={job.salary_min}-{job.salary_max} {job.currency}\n"
-                f"description:\n{job.description[:6000]}\n"
-                f"screening_questions={qs}"
+                f"description:\n{job.description[:6000]}"
             )
 
     if conversation.candidate_id:
@@ -155,7 +153,7 @@ def _build_context(db: Session, conversation: AssistantConversation) -> str:
     parts.append(
         "CAPABILITIES:\n"
         "- Explain any open job using FOCUSED JOB / OPEN JOBS.\n"
-        "- Answer process questions (screening, interviews, WhatsApp updates).\n"
+        "- Answer process questions (screening, interviews, notifications).\n"
         "- Schedule interview via action when application_id + scheduled_at are known."
     )
     return "\n\n".join(parts)
@@ -211,7 +209,6 @@ def _execute_schedule_action(
                 duration_minutes=int(action.get("duration_minutes") or 60),
                 meeting_link=action.get("meeting_link"),
                 location=action.get("location"),
-                send_whatsapp=bool(action.get("send_whatsapp", True)),
             ),
         )
     except Exception as exc:  # noqa: BLE001
@@ -294,9 +291,17 @@ class AssistantService:
             total=total,
         )
 
-    def get_conversation(self, db: Session, conversation_id: uuid.UUID) -> ConversationResponse:
+    def get_conversation(
+        self,
+        db: Session,
+        conversation_id: uuid.UUID,
+        *,
+        user: User | None = None,
+    ) -> ConversationResponse:
         obj = assistant_crud.get_conversation(db, conversation_id)
         if obj is None:
+            raise NotFoundError("Conversation not found")
+        if user is not None and obj.user_id != user.id:
             raise NotFoundError("Conversation not found")
         return _conv_to_response(obj)
 
@@ -306,9 +311,12 @@ class AssistantService:
         *,
         conversation_id: uuid.UUID,
         data: MessageCreate,
+        user: User | None = None,
     ) -> ChatReplyResponse:
         conversation = assistant_crud.get_conversation(db, conversation_id)
         if conversation is None:
+            raise NotFoundError("Conversation not found")
+        if user is not None and conversation.user_id != user.id:
             raise NotFoundError("Conversation not found")
 
         content = data.content.strip()

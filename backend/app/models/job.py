@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from sqlalchemy import DateTime, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy import Enum as SAEnum
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import Base
@@ -61,7 +61,6 @@ class Job(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     experience_min_years: Mapped[int | None] = mapped_column(Integer, nullable=True)
     experience_max_years: Mapped[int | None] = mapped_column(Integer, nullable=True)
     openings: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
-    screening_questions: Mapped[list[Any] | None] = mapped_column(JSONB, nullable=True)
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     closes_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 

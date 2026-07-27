@@ -6,7 +6,7 @@ import uuid
 from typing import TYPE_CHECKING
 
 from sqlalchemy import ForeignKey, Integer, String, Text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import Base
@@ -17,8 +17,6 @@ if TYPE_CHECKING:
     from app.models.resume import Resume
     from app.models.skill import CandidateSkill
     from app.models.user import User
-    from app.models.voice_call import VoiceCall
-    from app.models.whatsapp_log import WhatsappLog
 
 
 class Candidate(Base, UUIDPrimaryKeyMixin, TimestampMixin):
@@ -37,8 +35,11 @@ class Candidate(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     years_experience: Mapped[int | None] = mapped_column(Integer, nullable=True)
     linkedin_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    github_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     portfolio_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     current_title: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    education: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+    experience: Mapped[list | None] = mapped_column(JSONB, nullable=True)
 
     user: Mapped[User] = relationship("User", back_populates="candidate_profile")
     resumes: Mapped[list[Resume]] = relationship(
@@ -55,12 +56,4 @@ class Candidate(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         "CandidateSkill",
         back_populates="candidate",
         cascade="all, delete-orphan",
-    )
-    whatsapp_logs: Mapped[list[WhatsappLog]] = relationship(
-        "WhatsappLog",
-        back_populates="candidate",
-    )
-    voice_calls: Mapped[list[VoiceCall]] = relationship(
-        "VoiceCall",
-        back_populates="candidate",
     )

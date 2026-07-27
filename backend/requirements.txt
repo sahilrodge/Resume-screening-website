@@ -25,7 +25,6 @@ aiofiles==24.1.0
 
 # AI & integrations
 openai==1.58.1
-twilio==9.6.0
 cloudinary==1.41.0
 pypdf==5.1.0
 pywebpush==2.0.1

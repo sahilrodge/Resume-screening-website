@@ -8,13 +8,15 @@ import uuid
 from sqlalchemy.orm import Session
 
 from app.ai.job_matcher import compare_resume_to_job
-from app.core.exceptions import AppException, NotFoundError
+from app.core.config import settings
+from app.core.exceptions import AppException, ConflictError, NotFoundError
 from app.crud.application import application as application_crud
 from app.crud.job import job as job_crud
 from app.crud.resume import resume as resume_crud
 from app.models.application import Application
-from app.models.enums import ApplicationStatus, NotificationType, ResumeStatus
+from app.models.enums import ApplicationStatus, JobStatus, NotificationType, ResumeStatus
 from app.schemas.application import (
+    ApplicationApplyRequest,
     ApplicationCompareRequest,
     ApplicationListResponse,
     ApplicationResponse,
@@ -22,11 +24,13 @@ from app.schemas.application import (
     ApplicationStatusUpdate,
     SortOrder,
 )
-from app.core.config import settings
 from app.services.notification import notification_service
-from app.services.voice_call import voice_call_service
-from app.services.whatsapp import whatsapp_service
-from app.services.whatsapp_templates import WhatsappEvent
+
+
+def _as_str_list(value: object) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [str(s).strip() for s in value if str(s).strip()]
 
 
 def _to_response(obj: Application) -> ApplicationResponse:
@@ -40,13 +44,6 @@ def _to_response(obj: Application) -> ApplicationResponse:
     company_name = obj.job.company.name if obj.job and obj.job.company else None
     resume_file_name = obj.resume.file_name if obj.resume else None
 
-    matching = obj.matching_skills or []
-    missing = obj.missing_skills or []
-    if not isinstance(matching, list):
-        matching = []
-    if not isinstance(missing, list):
-        missing = []
-
     return ApplicationResponse(
         id=obj.id,
         job_id=obj.job_id,
@@ -59,8 +56,12 @@ def _to_response(obj: Application) -> ApplicationResponse:
         resume_file_name=resume_file_name,
         status=obj.status,
         match_score=float(obj.match_score) if obj.match_score is not None else None,
-        matching_skills=[str(s) for s in matching],
-        missing_skills=[str(s) for s in missing],
+        ats_score=float(obj.ats_score) if obj.ats_score is not None else None,
+        matching_skills=_as_str_list(obj.matching_skills),
+        missing_skills=_as_str_list(obj.missing_skills),
+        strengths=_as_str_list(obj.strengths),
+        weaknesses=_as_str_list(obj.weaknesses),
+        suggestions=_as_str_list(obj.suggestions),
         summary=obj.ai_summary,
         reasoning=obj.reasoning,
         created_at=obj.created_at,
@@ -125,14 +126,7 @@ class ApplicationService:
             status=ApplicationStatus.SCREENING if not is_new else ApplicationStatus.APPLIED,
         )
 
-        # Auto WhatsApp: Application Received (new applications)
         if is_new and saved:
-            whatsapp_service.notify_application_event(
-                db,
-                application=saved,
-                event=WhatsappEvent.APPLICATION_RECEIVED,
-                allow_missing_twilio=True,
-            )
             candidate_label = (
                 saved.candidate.user.full_name
                 if saved.candidate and saved.candidate.user
@@ -145,25 +139,96 @@ class ApplicationService:
                 title="New application",
                 message=f"{candidate_label} applied for {job_label}.",
                 notification_type=NotificationType.INFO,
-                event=WhatsappEvent.APPLICATION_RECEIVED.value,
+                event="application_received",
                 notify_candidate=True,
-                include_whatsapp_history=True,
             )
-            # After received notice, move into screening
             saved = application_crud.update_status(
                 db,
                 db_obj=saved,
                 status=ApplicationStatus.SCREENING,
             )
-            # Auto Vapi AI screening call
-            if settings.VAPI_AUTO_CALL_ON_APPLY:
-                voice_call_service.initiate_for_application(
-                    db,
-                    application=saved,
-                    allow_missing_vapi=True,
-                )
 
         return _to_response(saved)
+
+    def apply(
+        self,
+        db: Session,
+        *,
+        candidate_id: uuid.UUID,
+        data: ApplicationApplyRequest,
+    ) -> ApplicationResponse:
+        job = job_crud.get(db, data.job_id)
+        if job is None:
+            raise NotFoundError("Job not found")
+        if job.status != JobStatus.OPEN:
+            raise AppException(
+                "This job is not open for applications",
+                status_code=400,
+                code="job_not_open",
+            )
+
+        existing = application_crud.get_by_job_candidate(
+            db, job_id=job.id, candidate_id=candidate_id
+        )
+        if existing is not None:
+            raise ConflictError("You have already applied to this job")
+
+        resume = None
+        if data.resume_id:
+            resume = resume_crud.get(db, data.resume_id)
+            if resume is None or resume.candidate_id != candidate_id:
+                raise NotFoundError("Resume not found")
+        else:
+            resume = resume_crud.get_primary_or_latest(db, candidate_id=candidate_id)
+        if resume is None:
+            raise AppException(
+                "Upload a resume before applying",
+                status_code=400,
+                code="resume_required",
+            )
+
+        # Prefer AI screening when OpenAI + parsed resume are available
+        can_match = bool(
+            settings.OPENAI_API_KEY
+            and (
+                resume.status == ResumeStatus.PARSED
+                or resume.parsed_data
+                or resume.raw_text
+            )
+        )
+        if can_match:
+            try:
+                return self.compare(
+                    db,
+                    data=ApplicationCompareRequest(job_id=job.id, resume_id=resume.id),
+                )
+            except AppException:
+                # Fall through to a plain application if matching fails
+                pass
+
+        created = application_crud.create(
+            db,
+            job_id=job.id,
+            candidate_id=candidate_id,
+            resume_id=resume.id,
+            status=ApplicationStatus.APPLIED,
+        )
+        candidate_label = (
+            created.candidate.user.full_name
+            if created.candidate and created.candidate.user
+            else "A candidate"
+        )
+        job_label = created.job.title if created.job else "a role"
+        notification_service.notify_hiring_event(
+            db,
+            application=created,
+            title="New application",
+            message=f"{candidate_label} applied for {job_label}.",
+            notification_type=NotificationType.INFO,
+            event="application_received",
+            notify_candidate=True,
+        )
+        return _to_response(created)
 
     def update_status(
         self,
@@ -178,22 +243,6 @@ class ApplicationService:
 
         previous = obj.status
         updated = application_crud.update_status(db, db_obj=obj, status=data.status)
-
-        if data.send_whatsapp and previous != data.status:
-            event = None
-            if data.status == ApplicationStatus.APPLIED:
-                event = WhatsappEvent.APPLICATION_RECEIVED
-            elif data.status == ApplicationStatus.REJECTED:
-                event = WhatsappEvent.REJECTED
-            elif data.status in (ApplicationStatus.HIRED, ApplicationStatus.OFFERED):
-                event = WhatsappEvent.SELECTED
-            if event:
-                whatsapp_service.notify_application_event(
-                    db,
-                    application=updated,
-                    event=event,
-                    allow_missing_twilio=True,
-                )
 
         if previous != data.status and updated:
             candidate_label = (
@@ -225,7 +274,6 @@ class ApplicationService:
                     ApplicationStatus.OFFERED,
                     ApplicationStatus.INTERVIEW,
                 ),
-                include_whatsapp_history=False,
             )
 
         return _to_response(updated)
@@ -235,6 +283,66 @@ class ApplicationService:
         if obj is None:
             raise NotFoundError("Application not found")
         return _to_response(obj)
+
+    def build_report(self, db: Session, application_id: uuid.UUID) -> tuple[str, str]:
+        """Return (filename, markdown report body) for a stored screening result."""
+        obj = application_crud.get(db, application_id)
+        if obj is None:
+            raise NotFoundError("Application not found")
+        data = _to_response(obj)
+
+        def bullets(items: list[str], empty: str = "_None_") -> str:
+            if not items:
+                return empty
+            return "\n".join(f"- {item}" for item in items)
+
+        generated = data.updated_at.isoformat()
+        body = f"""# HirePulse Screening Report
+
+**Generated:** {generated}
+**Application ID:** {data.id}
+
+## Candidate
+- **Name:** {data.candidate_name or "—"}
+- **Email:** {data.candidate_email or "—"}
+- **Resume:** {data.resume_file_name or "—"}
+
+## Job
+- **Title:** {data.job_title or "—"}
+- **Company:** {data.company_name or "—"}
+- **Status:** {data.status.value}
+
+## Scores
+| Metric | Score |
+|---|---|
+| Job match score | {data.match_score if data.match_score is not None else "—"} / 100 |
+| ATS score | {data.ats_score if data.ats_score is not None else "—"} / 100 |
+
+## Summary
+{data.summary or "_No summary_"}
+
+## Matching skills
+{bullets(data.matching_skills)}
+
+## Missing skills
+{bullets(data.missing_skills)}
+
+## Strengths
+{bullets(data.strengths)}
+
+## Weaknesses
+{bullets(data.weaknesses)}
+
+## Resume suggestions
+{bullets(data.suggestions)}
+
+## Reasoning
+{data.reasoning or "_No reasoning_"}
+"""
+        safe_name = (data.candidate_name or "candidate").replace(" ", "_")
+        safe_job = (data.job_title or "role").replace(" ", "_")
+        filename = f"screening_{safe_name}_{safe_job}_{str(data.id)[:8]}.md"
+        return filename, body
 
     def list(
         self,

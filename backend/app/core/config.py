@@ -51,7 +51,11 @@ class Settings(BaseSettings):
     SECRET_KEY: str = Field(..., min_length=32)
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
-    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    # Session (browser close) vs Remember Me refresh lifetimes
+    REFRESH_TOKEN_SESSION_DAYS: int = 1
+    REFRESH_TOKEN_REMEMBER_DAYS: int = 30
+    # Back-compat alias used by older code paths
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 30
 
     # Database
     DATABASE_URL: str = Field(
@@ -65,7 +69,10 @@ class Settings(BaseSettings):
 
     # CORS (comma-separated strings in .env; NoDecode avoids JSON parsing)
     CORS_ORIGINS: Annotated[list[str], NoDecode] = Field(
-        default_factory=lambda: ["http://localhost:3000"]
+        default_factory=lambda: [
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+        ]
     )
     # Optional regex for preview deploys, e.g. https://.*\\.vercel\\.app
     CORS_ORIGIN_REGEX: str | None = None
@@ -95,22 +102,6 @@ class Settings(BaseSettings):
     CLOUDINARY_API_SECRET: str | None = None
     CLOUDINARY_FOLDER: str = "hirepulse/resumes"
     MAX_RESUME_SIZE_MB: int = 10
-
-    # Twilio WhatsApp
-    TWILIO_ACCOUNT_SID: str | None = None
-    TWILIO_AUTH_TOKEN: str | None = None
-    TWILIO_WHATSAPP_FROM: str | None = None
-    TWILIO_STATUS_CALLBACK_URL: str | None = None
-    TWILIO_VALIDATE_SIGNATURE: bool = False
-    WHATSAPP_REMINDER_HOURS: int = 24
-
-    # Vapi AI voice screening
-    VAPI_API_KEY: str | None = None
-    VAPI_PHONE_NUMBER_ID: str | None = None
-    VAPI_ASSISTANT_ID: str | None = None
-    VAPI_WEBHOOK_SECRET: str | None = None
-    VAPI_BASE_URL: str = "https://api.vapi.ai"
-    VAPI_AUTO_CALL_ON_APPLY: bool = True
 
     # Email (SMTP)
     SMTP_HOST: str | None = None
@@ -160,18 +151,6 @@ class Settings(BaseSettings):
             and self.CLOUDINARY_API_KEY
             and self.CLOUDINARY_API_SECRET
         )
-
-    @property
-    def twilio_configured(self) -> bool:
-        return bool(
-            self.TWILIO_ACCOUNT_SID
-            and self.TWILIO_AUTH_TOKEN
-            and self.TWILIO_WHATSAPP_FROM
-        )
-
-    @property
-    def vapi_configured(self) -> bool:
-        return bool(self.VAPI_API_KEY and self.VAPI_PHONE_NUMBER_ID)
 
     @property
     def smtp_configured(self) -> bool:

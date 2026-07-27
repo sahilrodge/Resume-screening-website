@@ -23,7 +23,7 @@ import { BackendStatus } from "@/components/dashboard/backend-status"
 import { PageHeader } from "@/components/shared/page-header"
 import { StatCard } from "@/components/shared/stat-card"
 import { Badge } from "@/components/ui/badge"
-import { Button, buttonVariants } from "@/components/ui/button"
+import { buttonVariants } from "@/components/ui/button"
 import {
   Card,
   CardContent,
@@ -31,19 +31,55 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { pipelineChart, recentActivity } from "@/data/admin-mock"
+import { useAuth } from "@/features/auth/auth-provider"
+import { analyticsApi } from "@/services/analytics"
 import { jobsApi } from "@/services/jobs"
+import { notificationsApi } from "@/services/notifications"
+import type { MonthlyHiringPoint } from "@/types/analytics"
+import type { AppNotification } from "@/types/notification"
 import type { JobDashboardStats } from "@/types/job"
 
+function formatWhen(iso: string) {
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(new Date(iso))
+  } catch {
+    return iso
+  }
+}
+
 export default function DashboardPage() {
+  const { user } = useAuth()
   const [stats, setStats] = useState<JobDashboardStats | null>(null)
+  const [pipeline, setPipeline] = useState<MonthlyHiringPoint[]>([])
+  const [activity, setActivity] = useState<AppNotification[]>([])
+  const reportHref = user?.role === "admin" ? "/reports" : "/analytics"
 
   useEffect(() => {
     void jobsApi
       .dashboardStats()
       .then(setStats)
       .catch(() => setStats(null))
+
+    void analyticsApi
+      .overview(6)
+      .then((data) => setPipeline(data.monthly_hiring ?? []))
+      .catch(() => setPipeline([]))
+
+    void notificationsApi
+      .list({ page: 1, page_size: 8 })
+      .then((res) => setActivity(res.items ?? []))
+      .catch(() => setActivity([]))
   }, [])
+
+  const chartData = pipeline.map((point) => ({
+    month: point.label,
+    applications: point.applications,
+    interviews: point.interviews,
+    hires: point.hires,
+  }))
 
   const cards = [
     {
@@ -91,7 +127,9 @@ export default function DashboardPage() {
           description="Monitor job status, applications, and hiring activity across HirePulse."
           actions={
             <>
-              <Button variant="outline">Download report</Button>
+              <Link href={reportHref} className={buttonVariants({ variant: "outline" })}>
+                Download report
+              </Link>
               <Link href="/jobs" className={buttonVariants()}>
                 Create job
               </Link>
@@ -130,47 +168,53 @@ export default function DashboardPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="h-[280px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={pipelineChart}>
-                  <defs>
-                    <linearGradient id="apps" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="var(--chart-1)" stopOpacity={0.35} />
-                      <stop offset="95%" stopColor="var(--chart-1)" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="month" tickLine={false} axisLine={false} />
-                  <YAxis tickLine={false} axisLine={false} width={36} />
-                  <Tooltip
-                    contentStyle={{
-                      borderRadius: 12,
-                      border: "1px solid var(--border)",
-                      background: "var(--card)",
-                    }}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="applications"
-                    stroke="var(--chart-1)"
-                    fill="url(#apps)"
-                    strokeWidth={2}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="interviews"
-                    stroke="var(--chart-2)"
-                    fill="transparent"
-                    strokeWidth={2}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="hires"
-                    stroke="var(--chart-3)"
-                    fill="transparent"
-                    strokeWidth={2}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
+              {chartData.length === 0 ? (
+                <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                  No hiring data yet
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={chartData}>
+                    <defs>
+                      <linearGradient id="apps" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="var(--chart-1)" stopOpacity={0.35} />
+                        <stop offset="95%" stopColor="var(--chart-1)" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="month" tickLine={false} axisLine={false} />
+                    <YAxis tickLine={false} axisLine={false} width={36} />
+                    <Tooltip
+                      contentStyle={{
+                        borderRadius: 12,
+                        border: "1px solid var(--border)",
+                        background: "var(--card)",
+                      }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="applications"
+                      stroke="var(--chart-1)"
+                      fill="url(#apps)"
+                      strokeWidth={2}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="interviews"
+                      stroke="var(--chart-2)"
+                      fill="transparent"
+                      strokeWidth={2}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="hires"
+                      stroke="var(--chart-3)"
+                      fill="transparent"
+                      strokeWidth={2}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              )}
             </CardContent>
           </Card>
         </FadeIn>
@@ -179,27 +223,32 @@ export default function DashboardPage() {
           <Card className="h-full border-border/70 bg-card/80 shadow-none backdrop-blur">
             <CardHeader>
               <CardTitle className="font-heading">Live activity</CardTitle>
-              <CardDescription>Recent admin and recruiter actions</CardDescription>
+              <CardDescription>Recent notifications and hiring alerts</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              {recentActivity.map((item) => (
-                <div
-                  key={item.id}
-                  className="flex items-start justify-between gap-3 rounded-xl border border-border/60 bg-muted/20 px-3 py-2.5 transition-colors hover:bg-muted/40"
-                >
-                  <div className="min-w-0 space-y-1">
-                    <p className="truncate text-sm">
-                      <span className="font-medium">{item.actor}</span>{" "}
-                      <span className="text-muted-foreground">{item.action}</span>{" "}
-                      <span className="font-medium">{item.target}</span>
-                    </p>
-                    <p className="text-xs text-muted-foreground">{item.time}</p>
+              {activity.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No recent activity yet.</p>
+              ) : (
+                activity.map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex items-start justify-between gap-3 rounded-xl border border-border/60 bg-muted/20 px-3 py-2.5 transition-colors hover:bg-muted/40"
+                  >
+                    <div className="min-w-0 space-y-1">
+                      <p className="truncate text-sm">
+                        <span className="font-medium">{item.title}</span>{" "}
+                        <span className="text-muted-foreground">{item.message}</span>
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatWhen(item.created_at)}
+                      </p>
+                    </div>
+                    <Badge variant="outline" className="shrink-0">
+                      {item.channel}
+                    </Badge>
                   </div>
-                  <Badge variant="outline" className="shrink-0">
-                    New
-                  </Badge>
-                </div>
-              ))}
+                ))
+              )}
             </CardContent>
           </Card>
         </FadeIn>

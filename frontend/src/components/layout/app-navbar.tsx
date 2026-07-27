@@ -8,7 +8,7 @@ import { Bell, Search } from "lucide-react"
 import { getNavMeta } from "@/config/navigation"
 import { useAuth } from "@/features/auth/auth-provider"
 import { ThemeToggle } from "@/components/layout/theme-toggle"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import {
   DropdownMenu,
@@ -36,9 +36,20 @@ function initials(name?: string | null) {
 export function AppNavbar() {
   const pathname = usePathname()
   const router = useRouter()
-  const meta = getNavMeta(pathname)
   const { user, logout } = useAuth()
+  const meta = getNavMeta(pathname, user?.role)
   const [unread, setUnread] = useState(0)
+  const [search, setSearch] = useState("")
+
+  const isCandidate = user?.role === "candidate"
+  const settingsHref = isCandidate ? "/portal/settings" : "/settings"
+  const profileHref = isCandidate ? "/portal/profile" : "/profile"
+  const notificationsHref = isCandidate
+    ? "/portal/notifications"
+    : "/notifications"
+  const searchPlaceholder = isCandidate
+    ? "Search open jobs…"
+    : "Search candidates or jobs…"
 
   useEffect(() => {
     if (!user) {
@@ -64,6 +75,17 @@ export function AppNavbar() {
     }
   }, [user, pathname])
 
+  function onSearchSubmit(event: React.FormEvent) {
+    event.preventDefault()
+    const q = search.trim()
+    if (!q) return
+    if (isCandidate) {
+      router.push(`/portal/jobs?q=${encodeURIComponent(q)}`)
+    } else {
+      router.push(`/candidates?q=${encodeURIComponent(q)}`)
+    }
+  }
+
   return (
     <header className="sticky top-0 z-20 border-b border-border/80 bg-background/80 backdrop-blur-xl">
       <div className="flex h-14 items-center gap-3 px-4 md:px-6">
@@ -79,16 +101,22 @@ export function AppNavbar() {
           </p>
         </div>
 
-        <div className="relative hidden w-full max-w-xs lg:block">
+        <form
+          onSubmit={onSearchSubmit}
+          className="relative hidden w-full max-w-xs lg:block"
+        >
           <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Search admin workspace..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={searchPlaceholder}
             className="h-8 bg-muted/40 pl-8"
+            aria-label="Search"
           />
-        </div>
+        </form>
 
         <Link
-          href="/notifications"
+          href={notificationsHref}
           className="relative inline-flex size-8 items-center justify-center rounded-lg text-foreground transition-colors hover:bg-muted"
           aria-label="Notifications"
         >
@@ -105,6 +133,9 @@ export function AppNavbar() {
         <DropdownMenu>
           <DropdownMenuTrigger className="inline-flex size-8 items-center justify-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring">
             <Avatar className="size-8">
+              {user?.avatar_url ? (
+                <AvatarImage src={user.avatar_url} alt={user.full_name} />
+              ) : null}
               <AvatarFallback className="bg-primary/15 text-xs font-medium text-primary">
                 {initials(user?.full_name)}
               </AvatarFallback>
@@ -113,20 +144,25 @@ export function AppNavbar() {
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel>
               <div className="flex flex-col">
-                <span className="text-sm font-medium">{user?.full_name ?? "Admin"}</span>
+                <span className="text-sm font-medium">
+                  {user?.full_name ?? "User"}
+                </span>
                 <span className="text-xs font-normal text-muted-foreground">
-                  {user?.email ?? "admin@hirepulse.io"}
+                  {user?.email ?? ""}
                 </span>
                 <span className="mt-1 text-[11px] font-medium tracking-wide text-primary uppercase">
-                  {user?.role ?? "admin"}
+                  {user?.role ?? ""}
                 </span>
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => router.push("/settings")}>
+            <DropdownMenuItem onClick={() => router.push(profileHref)}>
+              Profile
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => router.push(settingsHref)}>
               Settings
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => router.push("/notifications")}>
+            <DropdownMenuItem onClick={() => router.push(notificationsHref)}>
               Notifications
             </DropdownMenuItem>
             <DropdownMenuSeparator />

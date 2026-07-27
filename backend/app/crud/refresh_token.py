@@ -38,6 +38,10 @@ class CRUDRefreshToken:
         )
         return db.scalars(stmt).first()
 
+    def get_by_jti(self, db: Session, jti: str) -> RefreshToken | None:
+        stmt = select(RefreshToken).where(RefreshToken.jti == jti)
+        return db.scalars(stmt).first()
+
     def revoke_by_jti(self, db: Session, jti: str) -> bool:
         token = self.get_active_by_jti(db, jti)
         if token is None:

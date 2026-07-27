@@ -27,11 +27,10 @@ Return ONLY valid JSON:
     "type": "schedule_interview",
     "application_id": string|null,
     "scheduled_at": string|null (ISO-8601),
-    "interview_type": "phone"|"video"|"onsite"|"ai_voice",
+    "interview_type": "phone"|"video"|"onsite",
     "duration_minutes": number,
     "meeting_link": string|null,
-    "location": string|null,
-    "send_whatsapp": boolean
+    "location": string|null
   }
 }
 

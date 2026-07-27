@@ -27,7 +27,6 @@ class NotificationPreference(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         index=True,
     )
     email_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    whatsapp_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     in_app_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     push_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 

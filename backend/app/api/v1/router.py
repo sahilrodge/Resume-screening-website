@@ -13,9 +13,9 @@ from app.api.v1.endpoints import (
     interviews,
     jobs,
     notifications,
+    profile,
     resumes,
-    voice_calls,
-    whatsapp,
+    users,
 )
 
 api_router = APIRouter()
@@ -29,6 +29,6 @@ api_router.include_router(companies.router)
 api_router.include_router(interviews.router)
 api_router.include_router(jobs.router)
 api_router.include_router(notifications.router)
+api_router.include_router(profile.router)
 api_router.include_router(resumes.router)
-api_router.include_router(voice_calls.router)
-api_router.include_router(whatsapp.router)
+api_router.include_router(users.router)

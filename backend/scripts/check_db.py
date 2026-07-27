@@ -18,8 +18,6 @@ EXPECTED = {
     "job_skills",
     "interviews",
     "resumes",
-    "whatsapp_logs",
-    "voice_calls",
     "notifications",
     "notification_preferences",
     "push_subscriptions",

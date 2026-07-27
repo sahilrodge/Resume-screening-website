@@ -28,11 +28,17 @@ def _to_response(obj: Job) -> JobResponse:
 
     salary_min = float(obj.salary_min) if obj.salary_min is not None else None
     salary_max = float(obj.salary_max) if obj.salary_max is not None else None
+    skills = [
+        link.skill.name
+        for link in (obj.skills or [])
+        if link.skill is not None and link.skill.name
+    ]
 
     return JobResponse(
         id=obj.id,
         company_id=obj.company_id,
         company_name=obj.company.name if obj.company else None,
+        company_logo_url=obj.company.logo_url if obj.company else None,
         recruiter_id=obj.recruiter_id,
         recruiter_name=recruiter_name,
         title=obj.title,
@@ -46,8 +52,8 @@ def _to_response(obj: Job) -> JobResponse:
         experience_min_years=obj.experience_min_years,
         experience_max_years=obj.experience_max_years,
         openings=obj.openings,
-        screening_questions=[str(q) for q in (obj.screening_questions or [])],
         application_count=len(obj.applications) if obj.applications is not None else 0,
+        skills=skills,
         published_at=obj.published_at,
         closes_at=obj.closes_at,
         created_at=obj.created_at,

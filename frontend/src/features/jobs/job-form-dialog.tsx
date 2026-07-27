@@ -34,8 +34,8 @@ type JobFormDialogProps = {
   job?: Job | null
   submitting?: boolean
   onOpenChange: (open: boolean) => void
-  onCreate: (values: JobCreateValues) => Promise<void>
-  onUpdate: (values: JobUpdateValues) => Promise<void>
+  onCreate?: (values: JobCreateValues) => Promise<void>
+  onUpdate?: (values: JobUpdateValues) => Promise<void>
 }
 
 const defaultValues: JobCreateValues = {
@@ -51,7 +51,6 @@ const defaultValues: JobCreateValues = {
   experience_min_years: "",
   experience_max_years: "",
   openings: "1",
-  screening_questions: "",
 }
 
 export function JobFormDialog({
@@ -115,7 +114,6 @@ export function JobFormDialog({
           experience_max_years:
             job.experience_max_years != null ? String(job.experience_max_years) : "",
           openings: String(job.openings ?? 1),
-          screening_questions: (job.screening_questions || []).join("\n"),
         })
       }
     })
@@ -143,10 +141,12 @@ export function JobFormDialog({
   }
 
   async function submitCreate(values: JobCreateValues) {
+    if (!onCreate) return
     await onCreate(values)
   }
 
   async function submitUpdate(values: JobUpdateValues) {
+    if (!onUpdate) return
     await onUpdate(values)
   }
 
@@ -297,20 +297,6 @@ export function JobFormDialog({
               <Label htmlFor="experience_max_years">Exp max (years)</Label>
               <Input id="experience_max_years" {...form.register("experience_max_years")} />
             </div>
-          </div>
-
-          <div className="grid gap-2">
-            <Label htmlFor="screening_questions">Vapi screening questions</Label>
-            <textarea
-              id="screening_questions"
-              rows={4}
-              placeholder={"One question per line\nTell me about your experience...\nWhy this role?"}
-              className="w-full rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-              {...form.register("screening_questions")}
-            />
-            <p className="text-xs text-muted-foreground">
-              Asked automatically by the AI voice interviewer when a candidate applies.
-            </p>
           </div>
 
           <DialogFooter>

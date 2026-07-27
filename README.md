@@ -36,7 +36,7 @@ See **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)** for:
 ## Project layout
 
 ```
-backend/     FastAPI, Alembic, integrations (OpenAI, Twilio, Vapi, Cloudinary)
+backend/     FastAPI, Alembic, integrations (OpenAI, Cloudinary)
 frontend/    Next.js 15 + Tailwind + Recharts admin UI
 docker/      Postgres init scripts
 docs/        Deployment & Postgres guides

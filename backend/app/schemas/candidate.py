@@ -8,7 +8,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
-from app.schemas.parsed_resume import ParsedResumeData
+from app.schemas.parsed_resume import EducationItem, ExperienceItem, ParsedResumeData
 
 
 class CandidateCreate(BaseModel):
@@ -21,6 +21,7 @@ class CandidateCreate(BaseModel):
     summary: str | None = None
     years_experience: int | None = Field(default=None, ge=0, le=80)
     linkedin_url: str | None = Field(default=None, max_length=500)
+    github_url: str | None = Field(default=None, max_length=500)
     portfolio_url: str | None = Field(default=None, max_length=500)
     current_title: str | None = Field(default=None, max_length=255)
 
@@ -41,9 +42,13 @@ class CandidateUpdate(BaseModel):
     summary: str | None = None
     years_experience: int | None = Field(default=None, ge=0, le=80)
     linkedin_url: str | None = Field(default=None, max_length=500)
+    github_url: str | None = Field(default=None, max_length=500)
     portfolio_url: str | None = Field(default=None, max_length=500)
     current_title: str | None = Field(default=None, max_length=255)
     is_active: bool | None = None
+    skills: list[str] | None = None
+    education: list[EducationItem] | None = None
+    experience: list[ExperienceItem] | None = None
 
     @field_validator("full_name")
     @classmethod
@@ -70,6 +75,7 @@ class CandidateResponse(BaseModel):
     summary: str | None = None
     years_experience: int | None = None
     linkedin_url: str | None = None
+    github_url: str | None = None
     portfolio_url: str | None = None
     current_title: str | None = None
     created_at: datetime
@@ -80,6 +86,8 @@ class CandidateProfileResponse(CandidateResponse):
     """Candidate detail including latest OpenAI-parsed resume fields."""
 
     skills: list[str] = Field(default_factory=list)
+    education: list[EducationItem] = Field(default_factory=list)
+    experience: list[ExperienceItem] = Field(default_factory=list)
     resume_id: uuid.UUID | None = None
     resume_status: str | None = None
     parsed_data: ParsedResumeData | None = None

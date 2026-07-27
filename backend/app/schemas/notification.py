@@ -53,7 +53,6 @@ class MarkReadRequest(BaseModel):
 
 class NotificationPreferenceResponse(BaseModel):
     email_enabled: bool
-    whatsapp_enabled: bool
     in_app_enabled: bool
     push_enabled: bool
     vapid_public_key: str | None = None
@@ -65,7 +64,6 @@ class NotificationPreferenceResponse(BaseModel):
 
 class NotificationPreferenceUpdate(BaseModel):
     email_enabled: bool | None = None
-    whatsapp_enabled: bool | None = None
     in_app_enabled: bool | None = None
     push_enabled: bool | None = None
 

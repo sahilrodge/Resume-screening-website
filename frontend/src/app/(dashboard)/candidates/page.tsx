@@ -76,9 +76,73 @@ export default function CandidatesPage() {
   const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
+    const q = new URLSearchParams(window.location.search).get("q")
+    if (q) {
+      setSearch(q)
+      setDebouncedSearch(q)
+    }
+  }, [])
+
+  useEffect(() => {
     const id = window.setTimeout(() => setDebouncedSearch(search.trim()), 350)
     return () => window.clearTimeout(id)
   }, [search])
+
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      setError(null)
+      try {
+        const data = await candidatesApi.list({
+          page,
+          page_size: pageSize,
+          search: debouncedSearch || undefined,
+          location: location.trim() || undefined,
+          min_experience: minExperience ? Number(minExperience) : undefined,
+          max_experience: maxExperience ? Number(maxExperience) : undefined,
+          is_active:
+            activeFilter === "all" ? undefined : activeFilter === "active",
+          sort_by: sortBy,
+          sort_order: sortOrder,
+        })
+        if (cancelled) return
+        setItems(data.items)
+        setTotal(data.total)
+        setPages(data.pages)
+      } catch (err) {
+        if (!cancelled) {
+          setError(
+            err instanceof ApiError ? err.message : "Failed to load candidates"
+          )
+        }
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [
+    page,
+    pageSize,
+    debouncedSearch,
+    location,
+    minExperience,
+    maxExperience,
+    activeFilter,
+    sortBy,
+    sortOrder,
+  ])
+
+  useEffect(() => {
+    setPage(1)
+  }, [
+    debouncedSearch,
+    location,
+    minExperience,
+    maxExperience,
+    activeFilter,
+    sortBy,
+    sortOrder,
+  ])
 
   const fetchCandidates = useCallback(async () => {
     setError(null)
@@ -112,14 +176,6 @@ export default function CandidatesPage() {
     sortBy,
     sortOrder,
   ])
-
-  useEffect(() => {
-    void fetchCandidates()
-  }, [fetchCandidates])
-
-  useEffect(() => {
-    setPage(1)
-  }, [debouncedSearch, location, minExperience, maxExperience, activeFilter, sortBy, sortOrder])
 
   function openCreate() {
     setDialogMode("create")

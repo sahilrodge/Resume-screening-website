@@ -73,8 +73,12 @@ class CRUDApplication:
     ) -> Application:
         db_obj.resume_id = resume_id
         db_obj.match_score = match.match_score
+        db_obj.ats_score = match.ats_score
         db_obj.matching_skills = match.matching_skills
         db_obj.missing_skills = match.missing_skills
+        db_obj.strengths = match.strengths
+        db_obj.weaknesses = match.weaknesses
+        db_obj.suggestions = match.suggestions
         db_obj.ai_summary = match.summary
         db_obj.reasoning = match.reasoning
         db_obj.status = status

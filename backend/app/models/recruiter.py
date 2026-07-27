@@ -28,10 +28,10 @@ class Recruiter(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         nullable=False,
         index=True,
     )
-    company_id: Mapped[uuid.UUID] = mapped_column(
+    company_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("companies.id", ondelete="CASCADE"),
-        nullable=False,
+        ForeignKey("companies.id", ondelete="SET NULL"),
+        nullable=True,
         index=True,
     )
     phone: Mapped[str | None] = mapped_column(String(30), nullable=True)
@@ -39,5 +39,5 @@ class Recruiter(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     department: Mapped[str | None] = mapped_column(String(120), nullable=True)
 
     user: Mapped[User] = relationship("User", back_populates="recruiter_profile")
-    company: Mapped[Company] = relationship("Company", back_populates="recruiters")
+    company: Mapped[Company | None] = relationship("Company", back_populates="recruiters")
     jobs: Mapped[list[Job]] = relationship("Job", back_populates="recruiter")

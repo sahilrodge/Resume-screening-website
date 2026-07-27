@@ -140,10 +140,10 @@ export default function AnalyticsPage() {
     interviews: r.interviews,
   }))
 
-  const funnelData = data?.hiring_funnel.stages ?? []
-  const matchBuckets = data?.match_scores.buckets ?? []
-  const interviewStatus = data?.interview_results.by_status ?? []
-  const interviewType = data?.interview_results.by_type ?? []
+  const funnelData = data?.hiring_funnel?.stages ?? []
+  const matchBuckets = data?.match_scores?.buckets ?? []
+  const interviewStatus = data?.interview_results?.by_status ?? []
+  const interviewType = data?.interview_results?.by_type ?? []
 
   return (
     <PageTransition>
@@ -188,7 +188,7 @@ export default function AnalyticsPage() {
               <CardDescription>Volume vs AI-screened resumes</CardDescription>
             </CardHeader>
             <CardContent className="h-[280px]">
-              {!data?.applications.length ? (
+              {!data?.applications?.length ? (
                 <ChartEmpty />
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
@@ -229,7 +229,7 @@ export default function AnalyticsPage() {
               <CardTitle className="font-heading">Hiring Funnel</CardTitle>
               <CardDescription>
                 Pipeline stages
-                {data
+                {data?.hiring_funnel
                   ? ` · ${data.hiring_funnel.rejected} rejected · ${data.hiring_funnel.withdrawn} withdrawn`
                   : ""}
               </CardDescription>
@@ -324,7 +324,7 @@ export default function AnalyticsPage() {
               <CardTitle className="font-heading">AI Match Score</CardTitle>
               <CardDescription>
                 Score distribution
-                {data
+                {data?.match_scores
                   ? ` · avg ${formatScore(data.match_scores.avg_score)} · ${data.match_scores.scored_applications} scored`
                   : ""}
               </CardDescription>
@@ -354,11 +354,8 @@ export default function AnalyticsPage() {
               <CardTitle className="font-heading">Interview Results</CardTitle>
               <CardDescription>
                 By status
-                {data?.interview_results.avg_rating != null
+                {data?.interview_results?.avg_rating != null
                   ? ` · avg rating ${data.interview_results.avg_rating}`
-                  : ""}
-                {data?.interview_results.voice_completed
-                  ? ` · ${data.interview_results.voice_completed} voice screens`
                   : ""}
               </CardDescription>
             </CardHeader>
@@ -420,7 +417,7 @@ export default function AnalyticsPage() {
             <CardDescription>Applications, interviews, offers, and hires</CardDescription>
           </CardHeader>
           <CardContent className="h-[320px]">
-            {!data?.monthly_hiring.length ? (
+            {!data?.monthly_hiring?.length ? (
               <ChartEmpty />
             ) : (
               <ResponsiveContainer width="100%" height="100%">

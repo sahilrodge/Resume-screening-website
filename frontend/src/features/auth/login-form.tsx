@@ -2,19 +2,32 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 
 import { useAuth } from "@/features/auth/auth-provider"
+import { canAccessPath, homeForRole } from "@/lib/auth-roles"
 import { ApiError } from "@/types/api"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 
+function safeNextPath(raw: string | null, role: string): string | null {
+  if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return null
+  if (raw.startsWith("/login") || raw.startsWith("/register")) return null
+  if (!canAccessPath(role as "admin" | "recruiter" | "candidate", raw)) {
+    return null
+  }
+  return raw
+}
+
 export function LoginForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { login } = useAuth()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [rememberMe, setRememberMe] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
@@ -23,8 +36,13 @@ export function LoginForm() {
     setError(null)
     setSubmitting(true)
     try {
-      await login({ email, password })
-      router.replace("/dashboard")
+      const data = await login({
+        email,
+        password,
+        remember_me: rememberMe,
+      })
+      const next = safeNextPath(searchParams.get("next"), data.user.role)
+      router.replace(next ?? homeForRole(data.user.role))
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Login failed")
     } finally {
@@ -60,6 +78,14 @@ export function LoginForm() {
           placeholder="••••••••"
         />
       </div>
+
+      <label className="flex items-center gap-2 text-sm">
+        <Checkbox
+          checked={rememberMe}
+          onCheckedChange={(checked) => setRememberMe(Boolean(checked))}
+        />
+        Remember me for 30 days
+      </label>
 
       {error ? (
         <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">

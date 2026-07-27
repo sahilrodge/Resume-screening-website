@@ -16,9 +16,15 @@ class ApplicationCompareRequest(BaseModel):
     resume_id: uuid.UUID
 
 
+class ApplicationApplyRequest(BaseModel):
+    """Candidate self-serve apply to an open job."""
+
+    job_id: uuid.UUID
+    resume_id: uuid.UUID | None = None
+
+
 class ApplicationStatusUpdate(BaseModel):
     status: ApplicationStatus
-    send_whatsapp: bool = True
 
 
 class ApplicationResponse(BaseModel):
@@ -35,8 +41,12 @@ class ApplicationResponse(BaseModel):
     resume_file_name: str | None = None
     status: ApplicationStatus
     match_score: float | None = None
+    ats_score: float | None = None
     matching_skills: list[str] = Field(default_factory=list)
     missing_skills: list[str] = Field(default_factory=list)
+    strengths: list[str] = Field(default_factory=list)
+    weaknesses: list[str] = Field(default_factory=list)
+    suggestions: list[str] = Field(default_factory=list)
     summary: str | None = None
     reasoning: str | None = None
     created_at: datetime

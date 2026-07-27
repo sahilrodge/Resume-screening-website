@@ -8,8 +8,8 @@ import axios, {
 import { env } from "@/config/env"
 import { toApiError } from "@/lib/api/errors"
 import { apiLoading } from "@/lib/api/loading"
+import { sharedRefresh } from "@/lib/auth-refresh"
 import { authStorage } from "@/lib/auth-storage"
-import type { TokenPair } from "@/types/auth"
 
 /** Shared Axios instance — base URL from env */
 export const api: AxiosInstance = axios.create({
@@ -20,38 +20,6 @@ export const api: AxiosInstance = axios.create({
     Accept: "application/json",
   },
 })
-
-let refreshPromise: Promise<string | null> | null = null
-
-async function refreshAccessToken(): Promise<string | null> {
-  const refreshToken = authStorage.getRefreshToken()
-  if (!refreshToken) return null
-
-  try {
-    const { data } = await axios.post<TokenPair>(
-      `${env.apiUrl}/auth/refresh`,
-      { refresh_token: refreshToken },
-      {
-        headers: { "Content-Type": "application/json" },
-        // plain axios — avoid interceptor recursion
-      }
-    )
-    authStorage.setTokens(data)
-    return data.access_token
-  } catch {
-    authStorage.clear()
-    return null
-  }
-}
-
-function queueRefresh(): Promise<string | null> {
-  if (!refreshPromise) {
-    refreshPromise = refreshAccessToken().finally(() => {
-      refreshPromise = null
-    })
-  }
-  return refreshPromise
-}
 
 api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   if (!config.skipLoading) {
@@ -97,19 +65,22 @@ api.interceptors.response.use(
       !config.skipAuth
     ) {
       config._retry = true
-      const accessToken = await queueRefresh()
+      const tokens = await sharedRefresh()
 
-      if (accessToken) {
-        config.headers.Authorization = `Bearer ${accessToken}`
+      if (tokens?.access_token) {
+        config.headers.Authorization = `Bearer ${tokens.access_token}`
         return api.request(config)
       }
 
-      if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
+      if (
+        typeof window !== "undefined" &&
+        !window.location.pathname.startsWith("/login")
+      ) {
         window.location.href = "/login"
       }
     }
 
-    return Promise.reject(toApiError(error))
+    return Promise.reject(await toApiError(error))
   }
 )
 

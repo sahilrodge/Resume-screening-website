@@ -108,7 +108,6 @@ class NotificationService:
         pref = preference_crud.get_or_create(db, user_id=user.id)
         return NotificationPreferenceResponse(
             email_enabled=pref.email_enabled,
-            whatsapp_enabled=pref.whatsapp_enabled,
             in_app_enabled=pref.in_app_enabled,
             push_enabled=pref.push_enabled,
             vapid_public_key=settings.VAPID_PUBLIC_KEY,
@@ -128,7 +127,6 @@ class NotificationService:
             db,
             db_obj=pref,
             email_enabled=data.email_enabled,
-            whatsapp_enabled=data.whatsapp_enabled,
             in_app_enabled=data.in_app_enabled,
             push_enabled=data.push_enabled,
         )
@@ -175,7 +173,6 @@ class NotificationService:
         link: str | None = None,
         meta: dict[str, Any] | None = None,
         channels: Iterable[NotificationChannel] | None = None,
-        whatsapp_phone: str | None = None,
         respect_preferences: bool = True,
     ) -> list[NotificationResponse]:
         """Dispatch to one or more channels and persist history rows."""
@@ -225,12 +222,8 @@ class NotificationService:
                     )
                 )
             elif channel == NotificationChannel.EMAIL:
-                created.append(self._send_email_channel(db, user=user, title=title, message=message, notification_type=notification_type, link=link, meta=meta))
-            elif channel == NotificationChannel.PUSH:
-                created.append(self._send_push_channel(db, user=user, title=title, message=message, notification_type=notification_type, link=link, meta=meta))
-            elif channel == NotificationChannel.WHATSAPP:
                 created.append(
-                    self._send_whatsapp_channel(
+                    self._send_email_channel(
                         db,
                         user=user,
                         title=title,
@@ -238,7 +231,18 @@ class NotificationService:
                         notification_type=notification_type,
                         link=link,
                         meta=meta,
-                        phone=whatsapp_phone,
+                    )
+                )
+            elif channel == NotificationChannel.PUSH:
+                created.append(
+                    self._send_push_channel(
+                        db,
+                        user=user,
+                        title=title,
+                        message=message,
+                        notification_type=notification_type,
+                        link=link,
+                        meta=meta,
                     )
                 )
             else:
@@ -273,7 +277,6 @@ class NotificationService:
         event: str | None = None,
         interview: Interview | None = None,
         notify_candidate: bool = False,
-        include_whatsapp_history: bool = True,
     ) -> None:
         """Best-effort recruiter (+ optional candidate) multi-channel notify."""
         meta: dict[str, Any] = {
@@ -287,7 +290,6 @@ class NotificationService:
 
         href = link or f"/screening/{application.id}"
 
-        # Recruiter on the job
         recruiter_user_id = None
         if application.job and application.job.recruiter and application.job.recruiter.user_id:
             recruiter_user_id = application.job.recruiter.user_id
@@ -313,7 +315,6 @@ class NotificationService:
             except Exception:  # noqa: BLE001
                 logger.exception("Recruiter notify failed")
 
-        # Also ping admins via in-app only (avoid email spam)
         try:
             admin_ids = list(
                 db.scalars(
@@ -354,62 +355,14 @@ class NotificationService:
                         NotificationChannel.EMAIL,
                     ],
                 )
-                if include_whatsapp_history:
-                    self.record_whatsapp_history(
-                        db,
-                        user_id=application.candidate.user_id,
-                        title=title,
-                        message=message,
-                        meta={**(meta or {}), "source": "hiring_event"},
-                    )
             except Exception:  # noqa: BLE001
                 logger.exception("Candidate notify failed")
-
-        # Mirror WhatsApp delivery into recruiter history when requested
-        if include_whatsapp_history and recruiter_user_id:
-            try:
-                self.record_whatsapp_history(
-                    db,
-                    user_id=recruiter_user_id,
-                    title=f"WhatsApp · {title}",
-                    message=message,
-                    meta={**(meta or {}), "source": "hiring_event"},
-                )
-            except Exception:  # noqa: BLE001
-                logger.exception("WhatsApp history record failed")
-
-    def record_whatsapp_history(
-        self,
-        db: Session,
-        *,
-        user_id: uuid.UUID,
-        title: str,
-        message: str,
-        meta: dict[str, Any] | None = None,
-        delivery_status: NotificationDeliveryStatus = NotificationDeliveryStatus.SENT,
-    ) -> NotificationResponse:
-        """Store a WhatsApp delivery in notification history (does not resend)."""
-        return _to_response(
-            notification_crud.create(
-                db,
-                user_id=user_id,
-                title=title,
-                message=message,
-                notification_type=NotificationType.INFO,
-                channel=NotificationChannel.WHATSAPP,
-                delivery_status=delivery_status,
-                meta=meta,
-                is_read=True,
-            )
-        )
 
     def _channel_allowed(self, pref: Any, channel: NotificationChannel) -> bool:
         if channel == NotificationChannel.IN_APP:
             return bool(pref.in_app_enabled)
         if channel == NotificationChannel.EMAIL:
             return bool(pref.email_enabled)
-        if channel == NotificationChannel.WHATSAPP:
-            return bool(pref.whatsapp_enabled)
         if channel == NotificationChannel.PUSH:
             return bool(pref.push_enabled)
         return False
@@ -522,114 +475,6 @@ class NotificationService:
                 delivery_status=status,
                 link=link,
                 meta={**(meta or {}), "push_results": results},
-                is_read=True,
-            )
-        )
-
-    def _send_whatsapp_channel(
-        self,
-        db: Session,
-        *,
-        user: User,
-        title: str,
-        message: str,
-        notification_type: NotificationType,
-        link: str | None,
-        meta: dict[str, Any] | None,
-        phone: str | None,
-    ) -> NotificationResponse:
-        """Send WhatsApp to a phone if available; always write history."""
-        from app.services.whatsapp import whatsapp_service
-        from app.services.whatsapp_templates import WhatsappEvent
-        from app.utils.twilio_whatsapp import normalize_whatsapp_number
-
-        body = f"*{title}*\n{message}"
-        if link:
-            body = f"{body}\n{link}"
-
-        delivery = NotificationDeliveryStatus.SKIPPED
-        wa_meta: dict[str, Any] = {**(meta or {})}
-        target = phone
-        if not target and getattr(user, "recruiter_profile", None):
-            target = user.recruiter_profile.phone if user.recruiter_profile else None
-        if not target and getattr(user, "candidate_profile", None):
-            target = user.candidate_profile.phone if user.candidate_profile else None
-
-        if not target:
-            wa_meta["reason"] = "no_phone"
-        elif not settings.twilio_configured:
-            wa_meta["reason"] = "twilio_not_configured"
-        else:
-            try:
-                # Prefer candidate send path when candidate_id present
-                candidate_id = None
-                if meta and meta.get("candidate_id"):
-                    try:
-                        candidate_id = uuid.UUID(str(meta["candidate_id"]))
-                    except ValueError:
-                        candidate_id = None
-                if candidate_id:
-                    log = whatsapp_service.send_to_candidate(
-                        db,
-                        candidate_id=candidate_id,
-                        event=WhatsappEvent.MANUAL,
-                        body=body,
-                        application_id=(
-                            uuid.UUID(str(meta["application_id"]))
-                            if meta and meta.get("application_id")
-                            else None
-                        ),
-                        allow_missing_twilio=True,
-                    )
-                    if log:
-                        delivery = NotificationDeliveryStatus.SENT
-                        wa_meta["whatsapp_log_id"] = str(log.id)
-                    else:
-                        delivery = NotificationDeliveryStatus.FAILED
-                else:
-                    from app.crud.whatsapp_log import whatsapp_log as whatsapp_log_crud
-                    from app.models.enums import WhatsappDirection, WhatsappStatus
-                    from app.utils.twilio_whatsapp import (
-                        send_whatsapp_message,
-                        strip_whatsapp_prefix,
-                    )
-
-                    result = send_whatsapp_message(to=target, body=body)
-                    status = WhatsappStatus.SENT if result.get("ok") else WhatsappStatus.FAILED
-                    delivery = (
-                        NotificationDeliveryStatus.SENT
-                        if result.get("ok")
-                        else NotificationDeliveryStatus.FAILED
-                    )
-                    log = whatsapp_log_crud.create(
-                        db,
-                        to_number=strip_whatsapp_prefix(normalize_whatsapp_number(target)),
-                        from_number=strip_whatsapp_prefix(settings.TWILIO_WHATSAPP_FROM or ""),
-                        direction=WhatsappDirection.OUTBOUND,
-                        status=status,
-                        message_body=body,
-                        provider_message_id=result.get("sid"),
-                        error_message=result.get("error"),
-                        user_id=user.id,
-                        meta={**(meta or {}), "event_type": WhatsappEvent.MANUAL.value},
-                    )
-                    wa_meta["whatsapp_log_id"] = str(log.id)
-            except Exception as exc:  # noqa: BLE001
-                logger.exception("WhatsApp channel failed")
-                delivery = NotificationDeliveryStatus.FAILED
-                wa_meta["error"] = str(exc)
-
-        return _to_response(
-            notification_crud.create(
-                db,
-                user_id=user.id,
-                title=title,
-                message=message,
-                notification_type=notification_type,
-                channel=NotificationChannel.WHATSAPP,
-                delivery_status=delivery,
-                link=link,
-                meta=wa_meta,
                 is_read=True,
             )
         )

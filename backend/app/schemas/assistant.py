@@ -68,4 +68,13 @@ class ScheduleInterviewAction(BaseModel):
     duration_minutes: int = 60
     meeting_link: str | None = None
     location: str | None = None
-    send_whatsapp: bool = True
+
+
+class ScheduleInterviewAction(BaseModel):
+    type: Literal["schedule_interview"] = "schedule_interview"
+    application_id: uuid.UUID | None = None
+    scheduled_at: datetime | None = None
+    interview_type: str = "video"
+    duration_minutes: int = 60
+    meeting_link: str | None = None
+    location: str | None = None

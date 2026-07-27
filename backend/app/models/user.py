@@ -20,8 +20,6 @@ if TYPE_CHECKING:
     from app.models.push_subscription import PushSubscription
     from app.models.recruiter import Recruiter
     from app.models.refresh_token import RefreshToken
-    from app.models.voice_call import VoiceCall
-    from app.models.whatsapp_log import WhatsappLog
 
 
 class User(Base, UUIDPrimaryKeyMixin, TimestampMixin):
@@ -39,6 +37,7 @@ class User(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         index=True,
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    avatar_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     refresh_tokens: Mapped[list[RefreshToken]] = relationship(
         "RefreshToken",
@@ -76,12 +75,4 @@ class User(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     interviews_conducted: Mapped[list[Interview]] = relationship(
         "Interview",
         back_populates="interviewer",
-    )
-    whatsapp_logs: Mapped[list[WhatsappLog]] = relationship(
-        "WhatsappLog",
-        back_populates="user",
-    )
-    voice_calls: Mapped[list[VoiceCall]] = relationship(
-        "VoiceCall",
-        back_populates="user",
     )

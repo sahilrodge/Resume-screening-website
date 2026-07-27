@@ -15,6 +15,7 @@ from app.models.company import Company
 from app.models.enums import EmploymentType, JobStatus
 from app.models.job import Job
 from app.models.recruiter import Recruiter
+from app.models.skill import JobSkill
 from app.schemas.job import JobCreate, JobSortField, JobUpdate, SortOrder
 
 
@@ -23,6 +24,7 @@ def _base_query() -> Select[tuple[Job]]:
         joinedload(Job.company),
         joinedload(Job.recruiter).joinedload(Recruiter.user),
         selectinload(Job.applications),
+        selectinload(Job.skills).joinedload(JobSkill.skill),
     )
 
 

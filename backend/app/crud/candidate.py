@@ -61,6 +61,7 @@ class CRUDCandidate:
             summary=obj_in.summary,
             years_experience=obj_in.years_experience,
             linkedin_url=obj_in.linkedin_url,
+            github_url=getattr(obj_in, "github_url", None),
             portfolio_url=obj_in.portfolio_url,
             current_title=obj_in.current_title,
         )
@@ -80,13 +81,48 @@ class CRUDCandidate:
             db_obj.user.full_name = data.pop("full_name")
         if "is_active" in data:
             db_obj.user.is_active = data.pop("is_active")
+        skills = data.pop("skills", None)
+        education = data.pop("education", None)
+        experience = data.pop("experience", None)
 
         for field, value in data.items():
             setattr(db_obj, field, value)
 
+        if education is not None:
+            db_obj.education = [
+                e.model_dump() if hasattr(e, "model_dump") else e for e in education
+            ]
+        if experience is not None:
+            db_obj.experience = [
+                e.model_dump() if hasattr(e, "model_dump") else e for e in experience
+            ]
+
         db.add(db_obj.user)
         db.add(db_obj)
         db.commit()
+
+        if skills is not None:
+            from sqlalchemy import delete, func, select
+
+            from app.models.skill import CandidateSkill, Skill
+
+            db.execute(
+                delete(CandidateSkill).where(CandidateSkill.candidate_id == db_obj.id)
+            )
+            for name in skills:
+                cleaned = str(name).strip()
+                if not cleaned:
+                    continue
+                skill = db.scalars(
+                    select(Skill).where(func.lower(Skill.name) == cleaned.lower())
+                ).first()
+                if skill is None:
+                    skill = Skill(name=cleaned[:120])
+                    db.add(skill)
+                    db.flush()
+                db.add(CandidateSkill(candidate_id=db_obj.id, skill_id=skill.id))
+            db.commit()
+
         return self.get(db, db_obj.id)  # type: ignore[return-value]
 
     def delete(self, db: Session, *, db_obj: Candidate) -> None:

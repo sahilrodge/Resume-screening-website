@@ -20,8 +20,12 @@ export type ApplicationMatch = {
   resume_file_name: string | null
   status: ApplicationStatus
   match_score: number | null
+  ats_score: number | null
   matching_skills: string[]
   missing_skills: string[]
+  strengths: string[]
+  weaknesses: string[]
+  suggestions: string[]
   summary: string | null
   reasoning: string | null
   created_at: string

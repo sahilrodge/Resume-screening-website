@@ -163,14 +163,11 @@ class CRUDNotificationPreference:
         *,
         db_obj: NotificationPreference,
         email_enabled: bool | None = None,
-        whatsapp_enabled: bool | None = None,
         in_app_enabled: bool | None = None,
         push_enabled: bool | None = None,
     ) -> NotificationPreference:
         if email_enabled is not None:
             db_obj.email_enabled = email_enabled
-        if whatsapp_enabled is not None:
-            db_obj.whatsapp_enabled = whatsapp_enabled
         if in_app_enabled is not None:
             db_obj.in_app_enabled = in_app_enabled
         if push_enabled is not None:

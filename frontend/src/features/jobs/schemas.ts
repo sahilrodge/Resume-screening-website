@@ -24,7 +24,6 @@ export const jobCreateSchema = z
     experience_min_years: z.string().optional(),
     experience_max_years: z.string().optional(),
     openings: z.string().optional(),
-    screening_questions: z.string().optional(),
   })
   .superRefine((data, ctx) => {
     const salaryMin = data.salary_min?.trim()
@@ -107,13 +106,6 @@ function optionalNumber(value?: string) {
   return Number(trimmed)
 }
 
-function parseQuestions(value?: string) {
-  return (value || "")
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean)
-}
-
 export function toCreatePayload(values: JobCreateValues) {
   return {
     company_id: values.company_id,
@@ -128,7 +120,6 @@ export function toCreatePayload(values: JobCreateValues) {
     experience_min_years: optionalNumber(values.experience_min_years),
     experience_max_years: optionalNumber(values.experience_max_years),
     openings: optionalNumber(values.openings) ?? 1,
-    screening_questions: parseQuestions(values.screening_questions),
   }
 }
 
@@ -146,6 +137,5 @@ export function toUpdatePayload(values: JobUpdateValues) {
     experience_min_years: optionalNumber(values.experience_min_years) ?? null,
     experience_max_years: optionalNumber(values.experience_max_years) ?? null,
     openings: optionalNumber(values.openings) ?? 1,
-    screening_questions: parseQuestions(values.screening_questions),
   }
 }

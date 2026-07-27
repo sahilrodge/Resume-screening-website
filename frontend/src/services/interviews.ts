@@ -8,7 +8,7 @@ export type Interview = {
   job_title: string | null
   company_name: string | null
   interviewer_id: string | null
-  interview_type: "phone" | "video" | "onsite" | "ai_voice"
+  interview_type: "phone" | "video" | "onsite"
   status: "scheduled" | "completed" | "cancelled" | "no_show" | "rescheduled"
   scheduled_at: string
   duration_minutes: number
@@ -21,16 +21,17 @@ export type Interview = {
 export type InterviewCreatePayload = {
   application_id: string
   scheduled_at: string
-  interview_type?: "phone" | "video" | "onsite" | "ai_voice"
+  interview_type?: "phone" | "video" | "onsite"
   duration_minutes?: number
   meeting_link?: string
   location?: string
-  send_whatsapp?: boolean
 }
 
 export const interviewsApi = {
   list(params?: { page?: number; page_size?: number; application_id?: string }) {
-    return apiClient.get<{ items: Interview[]; total: number }>("/interviews", { params })
+    return apiClient.get<{ items: Interview[]; total: number }>("/interviews", {
+      params,
+    })
   },
 
   create(payload: InterviewCreatePayload) {
@@ -39,5 +40,9 @@ export const interviewsApi = {
 
   get(id: string) {
     return apiClient.get<Interview>(`/interviews/${id}`)
+  },
+
+  updateStatus(id: string, payload: { status: Interview["status"] }) {
+    return apiClient.patch<Interview>(`/interviews/${id}/status`, payload)
   },
 }

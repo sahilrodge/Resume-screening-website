@@ -11,9 +11,13 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode
 }) {
-  const { loading, isAuthenticated } = useAuth()
+  const { loading, isAuthenticated, user } = useAuth()
 
   if (loading || !isAuthenticated) {
+    return <AuthLoading />
+  }
+
+  if (user?.role === "candidate") {
     return <AuthLoading />
   }
 

@@ -47,7 +47,6 @@ class InterviewType(str, Enum):
     PHONE = "phone"
     VIDEO = "video"
     ONSITE = "onsite"
-    AI_VOICE = "ai_voice"
 
 
 class ResumeStatus(str, Enum):
@@ -67,7 +66,6 @@ class NotificationType(str, Enum):
 class NotificationChannel(str, Enum):
     IN_APP = "in_app"
     EMAIL = "email"
-    WHATSAPP = "whatsapp"
     SMS = "sms"
     PUSH = "push"
 
@@ -77,30 +75,6 @@ class NotificationDeliveryStatus(str, Enum):
     SENT = "sent"
     FAILED = "failed"
     SKIPPED = "skipped"
-
-
-class WhatsappDirection(str, Enum):
-    INBOUND = "inbound"
-    OUTBOUND = "outbound"
-
-
-class WhatsappStatus(str, Enum):
-    QUEUED = "queued"
-    SENT = "sent"
-    DELIVERED = "delivered"
-    READ = "read"
-    FAILED = "failed"
-
-
-class VoiceCallStatus(str, Enum):
-    INITIATED = "initiated"
-    RINGING = "ringing"
-    IN_PROGRESS = "in_progress"
-    COMPLETED = "completed"
-    FAILED = "failed"
-    NO_ANSWER = "no_answer"
-    BUSY = "busy"
-    CANCELLED = "cancelled"
 
 
 class ChatRole(str, Enum):

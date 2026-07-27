@@ -11,6 +11,7 @@ export type Job = {
   id: string
   company_id: string
   company_name: string | null
+  company_logo_url?: string | null
   recruiter_id: string | null
   recruiter_name: string | null
   title: string
@@ -24,8 +25,8 @@ export type Job = {
   experience_min_years: number | null
   experience_max_years: number | null
   openings: number
-  screening_questions: string[]
   application_count: number
+  skills?: string[]
   published_at: string | null
   closes_at: string | null
   created_at: string
@@ -87,7 +88,6 @@ export type JobCreatePayload = {
   experience_min_years?: number
   experience_max_years?: number
   openings?: number
-  screening_questions?: string[]
 }
 
 export type JobUpdatePayload = {
@@ -104,7 +104,6 @@ export type JobUpdatePayload = {
   experience_min_years?: number | null
   experience_max_years?: number | null
   openings?: number
-  screening_questions?: string[]
 }
 
 export const EMPLOYMENT_TYPE_LABELS: Record<EmploymentType, string> = {

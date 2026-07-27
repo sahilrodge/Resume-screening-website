@@ -40,6 +40,7 @@ class JobPerformanceItem(BaseModel):
 
 class RecruiterPerformanceItem(BaseModel):
     recruiter_id: uuid.UUID
+    user_id: uuid.UUID | None = None
     name: str
     jobs_owned: int = 0
     open_jobs: int = 0
@@ -93,9 +94,6 @@ class InterviewResults(BaseModel):
     avg_rating: float | None = None
     rated_count: int = 0
     rating_distribution: list[RatingBucket] = Field(default_factory=list)
-    voice_completed: int = 0
-    avg_voice_score: float | None = None
-    avg_voice_duration_seconds: float | None = None
 
 
 class MonthlyHiringPoint(BaseModel):

@@ -1,4 +1,5 @@
 import { apiClient } from "@/lib/api"
+import { sharedRefresh } from "@/lib/auth-refresh"
 import { authStorage } from "@/lib/auth-storage"
 import type {
   AuthResponse,
@@ -27,10 +28,21 @@ export const authApi = {
     return apiClient.get<User>("/auth/me")
   },
 
-  refresh(refreshToken: string) {
+  updateMe(payload: {
+    full_name?: string
+    current_password?: string
+    new_password?: string
+  }) {
+    return apiClient.patch<User>("/auth/me", payload)
+  },
+
+  refresh(refreshToken: string, rememberMe?: boolean) {
     return apiClient.post<TokenPair>(
       "/auth/refresh",
-      { refresh_token: refreshToken },
+      {
+        refresh_token: refreshToken,
+        remember_me: rememberMe,
+      },
       { skipAuth: true, skipAuthRefresh: true }
     )
   },
@@ -48,13 +60,20 @@ export const authApi = {
 export const authService = {
   async login(payload: LoginPayload): Promise<AuthResponse> {
     const data = await authApi.login(payload)
-    authStorage.setSession(data.user, data.tokens)
+    await authStorage.setSession(data.user, data.tokens)
     return data
   },
 
   async register(payload: RegisterPayload): Promise<AuthResponse> {
-    const data = await authApi.register(payload)
-    authStorage.setSession(data.user, data.tokens)
+    const data = await authApi.register({
+      ...payload,
+      remember_me: payload.remember_me ?? false,
+    })
+    // Register issues session tokens; persist with remember_me from tokens
+    await authStorage.setSession(data.user, {
+      ...data.tokens,
+      remember_me: payload.remember_me ?? data.tokens.remember_me,
+    })
     return data
   },
 
@@ -62,13 +81,21 @@ export const authService = {
     return authApi.me()
   },
 
+  async updateMe(payload: {
+    full_name?: string
+    current_password?: string
+    new_password?: string
+  }): Promise<User> {
+    const user = await authApi.updateMe(payload)
+    await authStorage.setUser(user)
+    return user
+  },
+
   async refresh(): Promise<TokenPair> {
-    const refreshToken = authStorage.getRefreshToken()
-    if (!refreshToken) {
-      throw new Error("No refresh token")
+    const tokens = await sharedRefresh()
+    if (!tokens) {
+      throw new Error("Session expired")
     }
-    const tokens = await authApi.refresh(refreshToken)
-    authStorage.setTokens(tokens)
     return tokens
   },
 
@@ -79,7 +106,7 @@ export const authService = {
         await authApi.logout(refreshToken)
       }
     } finally {
-      authStorage.clear()
+      await authStorage.clear()
     }
   },
 }

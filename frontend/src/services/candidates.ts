@@ -44,4 +44,16 @@ export const candidatesApi = {
   remove(id: string) {
     return apiClient.delete<{ message: string }>(`/candidates/${id}`)
   },
+
+  me() {
+    return apiClient.get<Candidate>("/candidates/me")
+  },
+
+  myProfile() {
+    return apiClient.get<CandidateProfile>("/candidates/me/profile")
+  },
+
+  updateMe(payload: CandidateUpdatePayload) {
+    return apiClient.patch<Candidate>("/candidates/me", payload)
+  },
 }

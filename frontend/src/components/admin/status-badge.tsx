@@ -40,7 +40,6 @@ const toneMap: Record<string, string> = {
   cancelled: "bg-muted text-muted-foreground",
   in_app: "bg-sky-500/15 text-sky-700 dark:text-sky-300",
   email: "bg-violet-500/15 text-violet-700 dark:text-violet-300",
-  whatsapp: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
   push: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
   pending: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
   skipped: "bg-muted text-muted-foreground",

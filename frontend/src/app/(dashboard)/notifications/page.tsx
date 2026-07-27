@@ -7,7 +7,6 @@ import {
   Bell,
   CheckCheck,
   Mail,
-  MessageCircle,
   MonitorSmartphone,
   Radio,
 } from "lucide-react"
@@ -28,7 +27,6 @@ const channelTabs: { key: NotificationChannel | "all"; label: string; icon: type
   { key: "all", label: "All", icon: Bell },
   { key: "in_app", label: "In-app", icon: MonitorSmartphone },
   { key: "email", label: "Email", icon: Mail },
-  { key: "whatsapp", label: "WhatsApp", icon: MessageCircle },
   { key: "push", label: "Push", icon: Radio },
 ]
 
@@ -36,8 +34,6 @@ function channelIcon(channel: NotificationChannel) {
   switch (channel) {
     case "email":
       return Mail
-    case "whatsapp":
-      return MessageCircle
     case "push":
       return Radio
     default:

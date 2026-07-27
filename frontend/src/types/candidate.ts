@@ -42,6 +42,7 @@ export type Candidate = {
   summary: string | null
   years_experience: number | null
   linkedin_url: string | null
+  github_url: string | null
   portfolio_url: string | null
   current_title: string | null
   created_at: string
@@ -50,6 +51,8 @@ export type Candidate = {
 
 export type CandidateProfile = Candidate & {
   skills: string[]
+  education?: EducationItem[]
+  experience?: ExperienceItem[]
   resume_id: string | null
   resume_status: string | null
   parsed_data: ParsedResumeData | null

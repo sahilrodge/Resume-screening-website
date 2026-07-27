@@ -92,5 +92,17 @@ class CRUDInterview:
         items = list(db.scalars(stmt).unique().all())
         return items, total
 
+    def update_status(
+        self,
+        db: Session,
+        *,
+        db_obj: Interview,
+        status: InterviewStatus,
+    ) -> Interview:
+        db_obj.status = status
+        db.add(db_obj)
+        db.commit()
+        return self.get(db, db_obj.id)  # type: ignore[return-value]
+
 
 interview = CRUDInterview()

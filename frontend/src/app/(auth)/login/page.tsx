@@ -1,3 +1,5 @@
+import { Suspense } from "react"
+
 import { LoginForm } from "@/features/auth/login-form"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
@@ -9,7 +11,9 @@ export default function LoginPage() {
         <CardDescription>Sign in to your HirePulse workspace</CardDescription>
       </CardHeader>
       <CardContent>
-        <LoginForm />
+        <Suspense fallback={<p className="text-sm text-muted-foreground">Loading…</p>}>
+          <LoginForm />
+        </Suspense>
       </CardContent>
     </Card>
   )

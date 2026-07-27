@@ -81,6 +81,10 @@ def _apply_parsed_to_candidate(
                 candidate.headline = f"{latest.title} at {latest.company}"[:255]
             else:
                 candidate.headline = latest.title[:255]
+        candidate.experience = [item.model_dump() for item in parsed.experience]
+
+    if parsed.education:
+        candidate.education = [item.model_dump() for item in parsed.education]
 
     years = _estimate_years(parsed.experience)
     if years is not None and candidate.years_experience is None:

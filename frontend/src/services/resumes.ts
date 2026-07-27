@@ -1,6 +1,4 @@
 import { api, apiClient } from "@/lib/api"
-import { env } from "@/config/env"
-import { authStorage } from "@/lib/auth-storage"
 import type { Resume, ResumeListResponse, ResumePreview } from "@/types/resume"
 
 export const resumesApi = {
@@ -30,32 +28,38 @@ export const resumesApi = {
     return data
   },
 
+  async uploadMine(payload: { file: File; isPrimary?: boolean }) {
+    const form = new FormData()
+    form.append("file", payload.file)
+    form.append("is_primary", String(payload.isPrimary ?? true))
+    const { data } = await api.post<Resume>("/resumes/me/upload", form)
+    return data
+  },
+
+  listMine(params?: { page?: number; page_size?: number }) {
+    return apiClient.get<ResumeListResponse>("/resumes/me", { params })
+  },
+
   remove(id: string) {
     return apiClient.delete<{ message: string }>(`/resumes/${id}`)
   },
 
-  /** Authenticated download URL (backend redirects to Cloudinary). */
-  downloadUrl(id: string) {
-    return `${env.apiUrl}/resumes/${id}/download`
-  },
-
-  async download(id: string, fileName: string) {
-    const token = authStorage.getAccessToken()
-    const response = await fetch(this.downloadUrl(id), {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-      redirect: "follow",
-    })
-    if (!response.ok) {
-      throw new Error("Download failed")
-    }
-    const blob = await response.blob()
-    const url = URL.createObjectURL(blob)
+  /**
+   * Open the Cloudinary file URL from preview metadata.
+   * Avoids XHR-following the API 302 (which breaks auth and CORS on CDN).
+   */
+  async download(id: string, fileName?: string) {
+    const preview = await apiClient.get<ResumePreview>(`/resumes/${id}/preview`)
+    const url = preview.download_url || preview.preview_url
     const anchor = document.createElement("a")
     anchor.href = url
-    anchor.download = fileName || "resume.pdf"
+    anchor.target = "_blank"
+    anchor.rel = "noopener noreferrer"
+    if (fileName || preview.file_name) {
+      anchor.download = fileName || preview.file_name
+    }
     document.body.appendChild(anchor)
     anchor.click()
     anchor.remove()
-    URL.revokeObjectURL(url)
   },
 }

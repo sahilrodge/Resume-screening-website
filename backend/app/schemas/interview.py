@@ -17,7 +17,10 @@ class InterviewCreate(BaseModel):
     duration_minutes: int = Field(default=60, ge=15, le=480)
     meeting_link: str | None = Field(default=None, max_length=1000)
     location: str | None = Field(default=None, max_length=255)
-    send_whatsapp: bool = True
+
+
+class InterviewStatusUpdate(BaseModel):
+    status: InterviewStatus
 
 
 class InterviewResponse(BaseModel):

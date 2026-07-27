@@ -31,6 +31,7 @@ export type JobPerformanceItem = {
 
 export type RecruiterPerformanceItem = {
   recruiter_id: string
+  user_id: string | null
   name: string
   jobs_owned: number
   open_jobs: number
@@ -84,9 +85,6 @@ export type InterviewResults = {
   avg_rating: number | null
   rated_count: number
   rating_distribution: RatingBucket[]
-  voice_completed: number
-  avg_voice_score: number | null
-  avg_voice_duration_seconds: number | null
 }
 
 export type MonthlyHiringPoint = {

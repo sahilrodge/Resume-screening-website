@@ -73,6 +73,53 @@ export default function JobsPage() {
     return () => window.clearTimeout(id)
   }, [search])
 
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      setError(null)
+      try {
+        const [data, dash] = await Promise.all([
+          jobsApi.list({
+            page,
+            page_size: pageSize,
+            search: debouncedSearch || undefined,
+            location: location.trim() || undefined,
+            status: statusFilter === "all" ? undefined : statusFilter,
+            employment_type: typeFilter === "all" ? undefined : typeFilter,
+            sort_by: sortBy,
+            sort_order: sortOrder,
+          }),
+          jobsApi.dashboardStats(),
+        ])
+        if (cancelled) return
+        setItems(data.items)
+        setTotal(data.total)
+        setPages(data.pages)
+        setStats(dash)
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof ApiError ? err.message : "Failed to load jobs")
+        }
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [
+    page,
+    pageSize,
+    debouncedSearch,
+    location,
+    statusFilter,
+    typeFilter,
+    sortBy,
+    sortOrder,
+  ])
+
+  useEffect(() => {
+    setPage(1)
+  }, [debouncedSearch, location, statusFilter, typeFilter, sortBy, sortOrder])
+
   const fetchJobs = useCallback(async () => {
     setError(null)
     try {
@@ -106,14 +153,6 @@ export default function JobsPage() {
     sortBy,
     sortOrder,
   ])
-
-  useEffect(() => {
-    void fetchJobs()
-  }, [fetchJobs])
-
-  useEffect(() => {
-    setPage(1)
-  }, [debouncedSearch, location, statusFilter, typeFilter, sortBy, sortOrder])
 
   function openCreate() {
     setDialogMode("create")

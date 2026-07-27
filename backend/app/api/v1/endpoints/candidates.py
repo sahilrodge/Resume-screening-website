@@ -7,7 +7,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Query, status
 
-from app.api.deps import DBSession, RecruiterUser
+from app.api.deps import CandidateUser, DBSession, RecruiterUser
 from app.schemas.candidate import (
     CandidateCreate,
     CandidateListResponse,
@@ -67,6 +67,43 @@ def list_candidates(
         sort_by=sort_by,
         sort_order=sort_order,
     )
+
+
+@router.get(
+    "/me",
+    response_model=CandidateResponse,
+    summary="Get the authenticated candidate profile",
+)
+def get_my_candidate(
+    db: DBSession,
+    current_user: CandidateUser,
+) -> CandidateResponse:
+    return candidate_service.get_by_user_id(db, current_user.id)
+
+
+@router.get(
+    "/me/profile",
+    response_model=CandidateProfileResponse,
+    summary="Get the authenticated candidate profile with resume data",
+)
+def get_my_candidate_profile(
+    db: DBSession,
+    current_user: CandidateUser,
+) -> CandidateProfileResponse:
+    return candidate_service.get_profile_by_user_id(db, current_user.id)
+
+
+@router.patch(
+    "/me",
+    response_model=CandidateResponse,
+    summary="Update the authenticated candidate profile",
+)
+def update_my_candidate(
+    payload: CandidateUpdate,
+    db: DBSession,
+    current_user: CandidateUser,
+) -> CandidateResponse:
+    return candidate_service.update_by_user_id(db, current_user.id, data=payload)
 
 
 @router.get(

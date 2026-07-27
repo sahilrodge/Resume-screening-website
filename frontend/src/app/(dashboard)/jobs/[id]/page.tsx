@@ -23,7 +23,6 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { JobFormDialog } from "@/features/jobs/job-form-dialog"
 import {
   toUpdatePayload,
-  type JobCreateValues,
   type JobUpdateValues,
 } from "@/features/jobs/schemas"
 import { useApiLoading } from "@/hooks/use-api-loading"
@@ -84,14 +83,18 @@ export default function JobDetailsPage() {
     }
   }
 
-  async function handleCreate(_values: JobCreateValues) {
-    // Dialog requires both handlers; create is unused on details page.
-  }
-
   function formatSalary(j: Job) {
     if (j.salary_min == null && j.salary_max == null) return "Not specified"
-    const min = j.salary_min != null ? `${j.currency} ${j.salary_min.toLocaleString()}` : "—"
-    const max = j.salary_max != null ? `${j.currency} ${j.salary_max.toLocaleString()}` : "—"
+    if (j.currency === "INR") {
+      const toLpa = (n: number) => (n / 100_000).toFixed(1)
+      const min = j.salary_min != null ? `${toLpa(j.salary_min)}` : "—"
+      const max = j.salary_max != null ? `${toLpa(j.salary_max)}` : "—"
+      return `₹${min}–${max} LPA`
+    }
+    const min =
+      j.salary_min != null ? `${j.currency} ${j.salary_min.toLocaleString()}` : "—"
+    const max =
+      j.salary_max != null ? `${j.currency} ${j.salary_max.toLocaleString()}` : "—"
     return `${min} – ${max}`
   }
 
@@ -193,9 +196,21 @@ export default function JobDetailsPage() {
             <section className="grid gap-4 sm:grid-cols-2">
               <div className="flex items-start gap-2">
                 <Building2 className="mt-0.5 size-4 text-muted-foreground" />
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Company</p>
-                  <p className="font-medium">{job.company_name || "—"}</p>
+                <div className="flex items-center gap-3">
+                  {job.company_logo_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={job.company_logo_url}
+                      alt={job.company_name ?? "Company"}
+                      className="size-10 rounded-lg border border-border object-contain bg-background p-1"
+                    />
+                  ) : null}
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                      Company
+                    </p>
+                    <p className="font-medium">{job.company_name || "—"}</p>
+                  </div>
                 </div>
               </div>
               <div className="flex items-start gap-2">
@@ -214,6 +229,18 @@ export default function JobDetailsPage() {
                 <p className="font-medium">{formatExperience(job)}</p>
               </div>
               <div>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                  Apply deadline
+                </p>
+                <p className="font-medium">
+                  {job.closes_at
+                    ? new Date(job.closes_at).toLocaleDateString(undefined, {
+                        dateStyle: "medium",
+                      })
+                    : "Open-ended"}
+                </p>
+              </div>
+              <div>
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">Published</p>
                 <p className="font-medium">
                   {job.published_at
@@ -228,11 +255,26 @@ export default function JobDetailsPage() {
             </section>
           </FadeIn>
 
+          {job.skills && job.skills.length > 0 ? (
+            <FadeIn>
+              <section className="space-y-2">
+                <h2 className="font-heading text-lg font-semibold">Skills</h2>
+                <div className="flex flex-wrap gap-2">
+                  {job.skills.map((skill) => (
+                    <Badge key={skill} variant="outline">
+                      {skill}
+                    </Badge>
+                  ))}
+                </div>
+              </section>
+            </FadeIn>
+          ) : null}
+
           <FadeIn>
             <section className="space-y-2">
               <h2 className="font-heading text-lg font-semibold">Description</h2>
               <p className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
-                {job.description}
+                {job.description.replace(/\s*<!-- seed:indian_jobs_v1 -->\s*/g, "").trim()}
               </p>
             </section>
           </FadeIn>
@@ -285,7 +327,6 @@ export default function JobDetailsPage() {
         job={job}
         submitting={submitting}
         onOpenChange={setDialogOpen}
-        onCreate={handleCreate}
         onUpdate={handleUpdate}
       />
     </PageTransition>

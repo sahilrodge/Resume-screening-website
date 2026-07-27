@@ -5,7 +5,13 @@ import { usePathname } from "next/navigation"
 import { motion } from "framer-motion"
 import { Sparkles } from "lucide-react"
 
-import { appName, appTagline, mainNav } from "@/config/navigation"
+import {
+  appName,
+  appTagline,
+  candidateTagline,
+  navForRole,
+} from "@/config/navigation"
+import { useAuth } from "@/features/auth/auth-provider"
 import {
   Sidebar,
   SidebarContent,
@@ -20,13 +26,31 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar"
 
+function isNavActive(pathname: string, href: string, homeHref: string) {
+  if (pathname === href) return true
+  // Home items should not stay active on every nested route
+  if (href === homeHref) return false
+  return pathname.startsWith(`${href}/`)
+}
+
 export function AppSidebar() {
   const pathname = usePathname()
+  const { user } = useAuth()
+  const items = navForRole(user?.role)
+  const isCandidate = user?.role === "candidate"
+  const homeHref = isCandidate ? "/portal" : "/dashboard"
+  const tagline = isCandidate ? candidateTagline : appTagline
+  const groupLabel =
+    user?.role === "admin"
+      ? "Admin"
+      : user?.role === "recruiter"
+        ? "Recruiter"
+        : "Candidate"
 
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className="border-b border-sidebar-border px-3 py-4">
-        <Link href="/dashboard" className="flex items-center gap-2.5 overflow-hidden">
+        <Link href={homeHref} className="flex items-center gap-2.5 overflow-hidden">
           <motion.span
             whileHover={{ scale: 1.05, rotate: -3 }}
             className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground"
@@ -37,19 +61,20 @@ export function AppSidebar() {
             <span className="truncate font-heading text-sm font-semibold tracking-tight">
               {appName}
             </span>
-            <span className="truncate text-xs text-muted-foreground">{appTagline}</span>
+            <span className="truncate text-xs text-muted-foreground">{tagline}</span>
           </span>
         </Link>
       </SidebarHeader>
 
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Admin</SidebarGroupLabel>
+          <SidebarGroupLabel className="group-data-[collapsible=icon]:hidden">
+            {groupLabel}
+          </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {mainNav.map((item) => {
-                const active =
-                  pathname === item.href || pathname.startsWith(`${item.href}/`)
+              {items.map((item) => {
+                const active = isNavActive(pathname, item.href, homeHref)
                 return (
                   <SidebarMenuItem key={item.href}>
                     <SidebarMenuButton
@@ -69,7 +94,7 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter className="border-t border-sidebar-border p-3 text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">
-        Admin console · demo data
+        <span className="capitalize">{user?.role ?? "guest"} access</span>
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>

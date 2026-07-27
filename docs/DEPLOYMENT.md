@@ -60,8 +60,6 @@ Integrations (optional but recommended):
 
 - `OPENAI_API_KEY`, `OPENAI_MODEL`
 - `CLOUDINARY_*`
-- `TWILIO_*`, `TWILIO_STATUS_CALLBACK_URL` → `https://<api>/api/v1/whatsapp/webhook/status`
-- `VAPI_*`
 - `SMTP_*` (email notifications)
 - `VAPID_*` (web push)
 
@@ -147,7 +145,6 @@ Backend image details:
 5. Link Postgres → Railway sets `DATABASE_URL` automatically (normalization handled in config).
 6. Set variables from section 2 (especially `SECRET_KEY`, `APP_ENV=production`, `CORS_ORIGINS`).
 7. Generate a public domain for the API service.
-8. Update Twilio/Vapi webhook URLs to the public Railway hostname.
 
 ### CLI (optional)
 
@@ -218,7 +215,6 @@ After the frontend URL is known, set Railway `CORS_ORIGINS` to that URL and rede
 - [ ] `CORS_ORIGINS` matches the Vercel domain exactly
 - [ ] `NEXT_PUBLIC_API_URL` points at the Railway API `/api/v1`
 - [ ] OpenAI / Cloudinary keys set if using parsing & uploads
-- [ ] Twilio status callback & Vapi webhook URLs updated
 - [ ] Create an admin user (register endpoint or seed script)
 - [ ] Confirm login + dashboard load from the Vercel URL
 
@@ -253,7 +249,6 @@ npm run dev
 | `NEXT_PUBLIC_API_URL` still localhost in prod | Rebuild Vercel after setting env (public vars are inlined at build) |
 | Railway boot loop | Check logs for DB URL / migrations; hit `/api/v1/health/ready` |
 | 502 from Vercel → API | Confirm Railway public domain and HTTPS |
-| WhatsApp webhooks fail | Set `TWILIO_STATUS_CALLBACK_URL` to public Railway URL; enable signature validation carefully |
 
 ---
 
