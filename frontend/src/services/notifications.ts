@@ -11,7 +11,7 @@ import type {
 function toQuery(params: NotificationListParams = {}) {
   const query: Record<string, string | number | boolean> = {}
   Object.entries(params).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && value !== "") {
+    if (value !== undefined && value !== null) {
       query[key] = value as string | number | boolean
     }
   })

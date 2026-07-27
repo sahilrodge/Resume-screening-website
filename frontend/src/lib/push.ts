@@ -1,5 +1,5 @@
-/** Convert a URL-safe base64 VAPID key to a Uint8Array for PushManager. */
-export function urlBase64ToUint8Array(base64String: string): Uint8Array {
+/** Convert a URL-safe base64 VAPID key to a BufferSource for PushManager. */
+export function urlBase64ToUint8Array(base64String: string): BufferSource {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4)
   const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/")
   const raw = atob(base64)
@@ -7,5 +7,6 @@ export function urlBase64ToUint8Array(base64String: string): Uint8Array {
   for (let i = 0; i < raw.length; i += 1) {
     output[i] = raw.charCodeAt(i)
   }
-  return output
+  // TS 5.x: Uint8Array<ArrayBufferLike> is not assignable to BufferSource without cast
+  return output as BufferSource
 }
