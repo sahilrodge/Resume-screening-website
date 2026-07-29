@@ -16,6 +16,7 @@ import { FadeIn, PageTransition } from "@/components/motion/page-transition"
 import { PageHeader } from "@/components/shared/page-header"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { useAuth } from "@/features/auth/auth-provider"
 import { cn } from "@/lib/utils"
 import { notificationsApi } from "@/services/notifications"
 import type {
@@ -53,6 +54,8 @@ function formatWhen(iso: string) {
 }
 
 export default function NotificationsPage() {
+  const { user } = useAuth()
+  const isAdmin = user?.role === "admin"
   const [items, setItems] = useState<AppNotification[]>([])
   const [channel, setChannel] = useState<NotificationChannel | "all">("all")
   const [unread, setUnread] = useState(0)
@@ -116,9 +119,11 @@ export default function NotificationsPage() {
           description={description}
           actions={
             <div className="flex flex-wrap gap-2">
-              <Button variant="outline" onClick={() => void sendTest()}>
-                Send test
-              </Button>
+              {isAdmin ? (
+                <Button variant="outline" onClick={() => void sendTest()}>
+                  Send test
+                </Button>
+              ) : null}
               <Button variant="outline" onClick={() => void markAllRead()}>
                 <CheckCheck data-icon="inline-start" />
                 Mark all read

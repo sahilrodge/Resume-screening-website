@@ -6,7 +6,8 @@ export const SESSION_COOKIE = "hirepulse_session"
 /** Session lifetimes (seconds) — aligned with backend refresh TTLs. */
 export const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30
 export const SESSION_REMEMBER_MAX_AGE_SECONDS = 60 * 60 * 24 * 30
-export const SESSION_BROWSER_MAX_AGE_SECONDS = 60 * 60 * 24 * 1
+/** Idle timeout for authenticated browser sessions (ms). */
+export const IDLE_TIMEOUT_MS = 30 * 60 * 1000
 
 export const PUBLIC_PATHS = ["/login", "/register"] as const
 
@@ -57,6 +58,7 @@ export const ROLE_ALLOWED_PREFIXES: Record<UserRole, readonly string[]> = {
     "/portal/screening",
     "/portal/assistant",
     "/portal/jobs",
+    "/portal/companies",
     "/portal/notifications",
     "/portal/profile",
     "/portal/settings",
@@ -193,7 +195,7 @@ export function buildSessionPayload(
     options?.maxAgeSeconds ??
     (options?.remember_me
       ? SESSION_REMEMBER_MAX_AGE_SECONDS
-      : SESSION_BROWSER_MAX_AGE_SECONDS)
+      : 60 * 60 * 24)
   return {
     role,
     uid,

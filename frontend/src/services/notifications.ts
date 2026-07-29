@@ -41,6 +41,10 @@ export const notificationsApi = {
     return apiClient.post<UnreadCountResponse>("/notifications/mark-all-read")
   },
 
+  clearAll() {
+    return apiClient.delete<UnreadCountResponse>("/notifications/clear")
+  },
+
   getPreferences() {
     return apiClient.get<NotificationPreferences>("/notifications/preferences")
   },

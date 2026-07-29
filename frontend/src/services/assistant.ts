@@ -1,12 +1,17 @@
 import { apiClient } from "@/lib/api"
 import type {
   AssistantConversation,
+  AssistantStatus,
   ChatReplyResponse,
   ConversationCreatePayload,
   ConversationListResponse,
 } from "@/types/assistant"
 
 export const assistantApi = {
+  getStatus() {
+    return apiClient.get<AssistantStatus>("/assistant/status")
+  },
+
   listConversations(params?: { page?: number; page_size?: number }) {
     return apiClient.get<ConversationListResponse>("/assistant/conversations", {
       params,

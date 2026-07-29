@@ -85,11 +85,12 @@
 }
 
 .dark {
+  color-scheme: dark;
   --background: oklch(0.16 0.015 240);
   --foreground: oklch(0.96 0.01 220);
   --card: oklch(0.2 0.018 240);
   --card-foreground: oklch(0.96 0.01 220);
-  --popover: oklch(0.2 0.018 240);
+  --popover: oklch(0.22 0.02 240);
   --popover-foreground: oklch(0.96 0.01 220);
   --primary: oklch(0.72 0.11 195);
   --primary-foreground: oklch(0.18 0.03 195);
@@ -123,6 +124,15 @@
     @apply border-border outline-ring/50;
   }
 
+  html {
+    @apply font-sans;
+    color-scheme: light;
+  }
+
+  .dark {
+    color-scheme: dark;
+  }
+
   body {
     @apply bg-background text-foreground antialiased;
     background-image:
@@ -137,7 +147,20 @@
       radial-gradient(ellipse 60% 40% at 100% 0%, oklch(0.45 0.08 160 / 0.12), transparent);
   }
 
-  html {
-    @apply font-sans;
+  /* Theme-aware native form controls (fallback when not using Select) */
+  select,
+  option {
+    color: var(--foreground);
+    background-color: var(--popover);
+  }
+
+  ::selection {
+    background-color: color-mix(in oklch, var(--primary) 28%, transparent);
+  }
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
   }
 }

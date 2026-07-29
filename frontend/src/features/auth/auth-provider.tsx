@@ -15,6 +15,7 @@ import { usePathname, useRouter } from "next/navigation"
 import {
   canAccessPath,
   homeForRole,
+  IDLE_TIMEOUT_MS,
   isPublicPath,
 } from "@/lib/auth-roles"
 import { authStorage } from "@/lib/auth-storage"
@@ -33,12 +34,68 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
+/**
+ * Browsers store setTimeout delays as signed 32-bit ints (max ~24.8 days).
+ * A 30-day remember-me refresh TTL overflows and fires almost immediately.
+ */
+const MAX_TIMEOUT_MS = 2_147_483_647
+const ACTIVITY_KEY = "hirepulse_last_activity_at"
+
+function scheduleAt(expiresAt: number, onExpire: () => void): () => void {
+  let timeoutId: number | null = null
+  let cancelled = false
+
+  const arm = () => {
+    if (cancelled) return
+    const remaining = expiresAt - Date.now()
+    if (remaining <= 0) {
+      onExpire()
+      return
+    }
+    timeoutId = window.setTimeout(arm, Math.min(remaining, MAX_TIMEOUT_MS))
+  }
+  arm()
+
+  return () => {
+    cancelled = true
+    if (timeoutId != null) window.clearTimeout(timeoutId)
+  }
+}
+
+function touchActivity() {
+  if (typeof window === "undefined") return
+  try {
+    const last = Number(window.localStorage.getItem(ACTIVITY_KEY) || 0)
+    const now = Date.now()
+    // Throttle writes — activity listeners fire frequently.
+    if (Number.isFinite(last) && now - last < 15_000) return
+    window.localStorage.setItem(ACTIVITY_KEY, String(now))
+  } catch {
+    // ignore quota / private mode
+  }
+}
+
+function readLastActivity(): number {
+  if (typeof window === "undefined") return Date.now()
+  try {
+    const raw = window.localStorage.getItem(ACTIVITY_KEY)
+    const value = raw ? Number(raw) : NaN
+    return Number.isFinite(value) ? value : Date.now()
+  } catch {
+    return Date.now()
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const refreshTimer = useRef<number | null>(null)
+  const idleTimer = useRef<number | null>(null)
+  const bootId = useRef(0)
+  const pathnameRef = useRef(pathname)
+  pathnameRef.current = pathname
 
   const clearRefreshTimer = useCallback(() => {
     if (refreshTimer.current != null) {
@@ -47,29 +104,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  const clearIdleTimer = useCallback(() => {
+    if (idleTimer.current != null) {
+      window.clearTimeout(idleTimer.current)
+      idleTimer.current = null
+    }
+  }, [])
+
   const forceLogout = useCallback(async () => {
     clearRefreshTimer()
+    clearIdleTimer()
     await authStorage.clear()
     setUser(null)
-    if (!isPublicPath(pathname)) {
-      router.replace("/login")
+    try {
+      window.localStorage.removeItem(ACTIVITY_KEY)
+    } catch {
+      // ignore
     }
-  }, [clearRefreshTimer, pathname, router])
+    window.location.replace("/login")
+  }, [clearRefreshTimer, clearIdleTimer])
 
   const scheduleProactiveRefresh = useCallback(() => {
     clearRefreshTimer()
     if (typeof window === "undefined") return
 
-    const accessExp = authStorage.getAccessExpiresAt()
+    const refreshToken = authStorage.getRefreshToken()
     const refreshExp = authStorage.getRefreshExpiresAt()
-    if (!refreshExp || Date.now() >= refreshExp) {
+    if (!refreshToken) {
+      return
+    }
+    if (refreshExp && Date.now() >= refreshExp) {
       void forceLogout()
       return
     }
 
-    // Refresh 60s before access expiry (minimum wait 5s)
+    const accessExp = authStorage.getAccessExpiresAt()
     const refreshAt = accessExp ? accessExp - 60_000 : Date.now() + 5_000
-    const delay = Math.max(5_000, refreshAt - Date.now())
+    const delay = Math.min(
+      MAX_TIMEOUT_MS,
+      Math.max(5_000, refreshAt - Date.now())
+    )
 
     refreshTimer.current = window.setTimeout(() => {
       void (async () => {
@@ -87,36 +161,57 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }, delay)
   }, [clearRefreshTimer, forceLogout])
 
+  const armIdleTimeout = useCallback(() => {
+    clearIdleTimer()
+    if (typeof window === "undefined" || IDLE_TIMEOUT_MS <= 0) return
+    const last = readLastActivity()
+    const remaining = Math.max(1_000, IDLE_TIMEOUT_MS - (Date.now() - last))
+    idleTimer.current = window.setTimeout(() => {
+      if (Date.now() - readLastActivity() >= IDLE_TIMEOUT_MS) {
+        void forceLogout()
+      } else {
+        armIdleTimeout()
+      }
+    }, Math.min(remaining, MAX_TIMEOUT_MS))
+  }, [clearIdleTimer, forceLogout])
+
   const refreshUser = useCallback(async () => {
-    if (authStorage.isRefreshExpired() && !authStorage.getAccessToken()) {
-      await authStorage.clear()
+    const access = authStorage.getAccessToken()
+    const refresh = authStorage.getRefreshToken()
+
+    if (!access && !refresh) {
       setUser(null)
+      // Drop orphan cookie only; re-checks inside the lock so login cannot be wiped.
+      await authStorage.clearIfEmpty()
       return
     }
 
-    if (!authStorage.getAccessToken() && !authStorage.getRefreshToken()) {
+    if (authStorage.isRefreshExpired() && !access) {
       await authStorage.clear()
       setUser(null)
       return
     }
 
     try {
-      if (authStorage.shouldRefreshAccess() && authStorage.getRefreshToken()) {
+      if (authStorage.shouldRefreshAccess() && refresh) {
         await authService.refresh()
       }
       const me = await authService.me()
       setUser(me)
       await authStorage.setUser(me)
+      touchActivity()
       scheduleProactiveRefresh()
+      armIdleTimeout()
     } catch {
-      // One refresh attempt if access is stale
       try {
         if (authStorage.getRefreshToken() && !authStorage.isRefreshExpired()) {
           await authService.refresh()
           const me = await authService.me()
           setUser(me)
           await authStorage.setUser(me)
+          touchActivity()
           scheduleProactiveRefresh()
+          armIdleTimeout()
           return
         }
       } catch {
@@ -125,30 +220,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await authStorage.clear()
       setUser(null)
       clearRefreshTimer()
+      clearIdleTimer()
     }
-  }, [clearRefreshTimer, scheduleProactiveRefresh])
+  }, [
+    clearRefreshTimer,
+    clearIdleTimer,
+    scheduleProactiveRefresh,
+    armIdleTimeout,
+  ])
 
   useEffect(() => {
+    const id = ++bootId.current
     const cached = authStorage.getUser()
     if (cached) setUser(cached)
 
-    refreshUser().finally(() => setLoading(false))
-    return () => clearRefreshTimer()
-  }, [refreshUser, clearRefreshTimer])
+    void refreshUser().finally(() => {
+      if (bootId.current === id) setLoading(false)
+    })
+    return () => {
+      clearRefreshTimer()
+      clearIdleTimer()
+    }
+    // Bootstrap once on mount; refreshUser is stable enough via queue + refs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
-  // Auto-logout when refresh lifetime elapses (tab left open)
   useEffect(() => {
     if (loading || !user) return
     const refreshExp = authStorage.getRefreshExpiresAt()
     if (!refreshExp) return
-    const delay = Math.max(1_000, refreshExp - Date.now())
-    const id = window.setTimeout(() => {
-      void forceLogout()
-    }, delay)
-    return () => window.clearTimeout(id)
+    return scheduleAt(refreshExp, () => {
+      if (authStorage.isRefreshExpired()) {
+        void forceLogout()
+      }
+    })
   }, [loading, user, forceLogout])
 
-  // Resume silent refresh when the tab becomes visible again
   useEffect(() => {
     if (loading || !user) return
     function onVisible() {
@@ -157,6 +264,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         void forceLogout()
         return
       }
+      if (Date.now() - readLastActivity() >= IDLE_TIMEOUT_MS) {
+        void forceLogout()
+        return
+      }
+      touchActivity()
+      armIdleTimeout()
       if (authStorage.shouldRefreshAccess()) {
         void authService
           .refresh()
@@ -166,14 +279,65 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     document.addEventListener("visibilitychange", onVisible)
     return () => document.removeEventListener("visibilitychange", onVisible)
-  }, [loading, user, forceLogout, scheduleProactiveRefresh])
+  }, [loading, user, forceLogout, scheduleProactiveRefresh, armIdleTimeout])
+
+  useEffect(() => {
+    if (loading || !user) return
+
+    const onActivity = () => {
+      touchActivity()
+      armIdleTimeout()
+    }
+
+    const events: Array<keyof DocumentEventMap> = [
+      "click",
+      "keydown",
+      "mousemove",
+      "scroll",
+      "touchstart",
+    ]
+    events.forEach((event) =>
+      document.addEventListener(event, onActivity, { passive: true })
+    )
+    touchActivity()
+    armIdleTimeout()
+
+    return () => {
+      events.forEach((event) => document.removeEventListener(event, onActivity))
+      clearIdleTimer()
+    }
+  }, [loading, user, armIdleTimeout, clearIdleTimer])
 
   const logout = useCallback(async () => {
     clearRefreshTimer()
-    await authService.logout()
-    setUser(null)
-    router.replace("/login")
-  }, [router, clearRefreshTimer])
+    clearIdleTimer()
+    try {
+      await authService.logout()
+    } finally {
+      setUser(null)
+      try {
+        window.localStorage.removeItem(ACTIVITY_KEY)
+      } catch {
+        // ignore
+      }
+      // Hard redirect clears SPA history + avoids bfcache of protected pages
+      window.location.replace("/login")
+    }
+  }, [clearRefreshTimer, clearIdleTimer])
+
+  useEffect(() => {
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (!event.persisted) return
+      const hasSession = Boolean(
+        authStorage.getAccessToken() || authStorage.getRefreshToken()
+      )
+      if (!hasSession && !isPublicPath(window.location.pathname)) {
+        window.location.replace("/login")
+      }
+    }
+    window.addEventListener("pageshow", onPageShow)
+    return () => window.removeEventListener("pageshow", onPageShow)
+  }, [])
 
   useEffect(() => {
     if (loading) return
@@ -203,20 +367,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async (payload: LoginPayload) => {
       const data = await authService.login(payload)
       setUser(data.user)
+      touchActivity()
       scheduleProactiveRefresh()
+      armIdleTimeout()
       return data
     },
-    [scheduleProactiveRefresh]
+    [scheduleProactiveRefresh, armIdleTimeout]
   )
 
   const register = useCallback(
     async (payload: RegisterPayload) => {
       const data = await authService.register(payload)
       setUser(data.user)
+      touchActivity()
       scheduleProactiveRefresh()
+      armIdleTimeout()
       return data
     },
-    [scheduleProactiveRefresh]
+    [scheduleProactiveRefresh, armIdleTimeout]
   )
 
   const value = useMemo(

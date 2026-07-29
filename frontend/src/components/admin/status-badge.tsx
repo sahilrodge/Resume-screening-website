@@ -45,13 +45,14 @@ const toneMap: Record<string, string> = {
   skipped: "bg-muted text-muted-foreground",
 }
 
-export function StatusBadge({ status }: { status: string }) {
+export function StatusBadge({ status }: { status?: string | null }) {
+  const label = status?.trim() || "Unknown"
   return (
     <Badge
       variant="outline"
-      className={cn("border-transparent font-medium", toneMap[status] ?? "bg-muted")}
+      className={cn("border-transparent font-medium", toneMap[label] ?? "bg-muted")}
     >
-      {status}
+      {label}
     </Badge>
   )
 }

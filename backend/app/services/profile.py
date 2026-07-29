@@ -6,7 +6,8 @@ from fastapi import UploadFile
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session, joinedload
 
-from app.core.exceptions import AppException, UnauthorizedError
+from app.core.config import settings
+from app.core.exceptions import AppException, ConflictError, UnauthorizedError
 from app.core.security import verify_password
 from app.crud.candidate import candidate as candidate_crud
 from app.crud.company import company as company_crud
@@ -20,7 +21,7 @@ from app.models.user import User
 from app.schemas.company import CompanyCreate
 from app.schemas.parsed_resume import EducationItem, ExperienceItem
 from app.schemas.profile import ProfileResponse, ProfileUpdate
-from app.utils.cloudinary_storage import upload_image
+from app.utils.resume_storage import store_image
 
 ALLOWED_AVATAR_TYPES = {
     "image/jpeg",
@@ -29,6 +30,13 @@ ALLOWED_AVATAR_TYPES = {
     "image/gif",
 }
 MAX_AVATAR_BYTES = 5 * 1024 * 1024
+
+
+def _local_public_url(public_path: str) -> str:
+    base = (settings.PUBLIC_API_URL or "http://127.0.0.1:8000").rstrip("/")
+    if public_path.startswith("http://") or public_path.startswith("https://"):
+        return public_path
+    return f"{base}{public_path}"
 
 
 def _education_list(raw: object) -> list[EducationItem]:
@@ -136,6 +144,7 @@ class ProfileService:
                 **base,
                 phone=candidate.phone,
                 location=candidate.location,
+                date_of_birth=candidate.date_of_birth,
                 headline=candidate.headline,
                 summary=candidate.summary,
                 years_experience=candidate.years_experience,
@@ -143,12 +152,16 @@ class ProfileService:
                 linkedin_url=candidate.linkedin_url,
                 github_url=candidate.github_url,
                 portfolio_url=candidate.portfolio_url,
+                preferred_job_role=candidate.preferred_job_role,
+                preferred_location=candidate.preferred_location,
+                expected_salary=candidate.expected_salary,
                 skills=skills,
                 education=education,
                 experience=experience,
                 resume_id=latest.id if latest else None,
                 resume_file_name=latest.file_name if latest else None,
                 resume_status=latest.status.value if latest else None,
+                resume_uploaded_at=latest.created_at if latest else None,
             )
 
         if user.role == UserRole.RECRUITER:
@@ -176,6 +189,15 @@ class ProfileService:
             user_crud.update(db, db_obj=user, password=payload["new_password"])
             user = user_crud.get_by_id(db, user.id) or user
 
+        if "email" in payload and payload["email"]:
+            new_email = str(payload["email"]).strip().lower()
+            if new_email != user.email.lower():
+                existing = user_crud.get_by_email(db, new_email)
+                if existing is not None and existing.id != user.id:
+                    raise ConflictError("Email already registered")
+                user_crud.update(db, db_obj=user, email=new_email)
+                user = user_crud.get_by_id(db, user.id) or user
+
         if "full_name" in payload and payload["full_name"]:
             user_crud.update(db, db_obj=user, full_name=payload["full_name"])
             user = user_crud.get_by_id(db, user.id) or user
@@ -191,6 +213,7 @@ class ProfileService:
             for field in (
                 "phone",
                 "location",
+                "date_of_birth",
                 "headline",
                 "summary",
                 "years_experience",
@@ -198,6 +221,9 @@ class ProfileService:
                 "linkedin_url",
                 "github_url",
                 "portfolio_url",
+                "preferred_job_role",
+                "preferred_location",
+                "expected_salary",
             ):
                 if field in payload:
                     setattr(candidate, field, payload[field])
@@ -259,8 +285,23 @@ class ProfileService:
                 code="avatar_too_large",
             )
 
-        uploaded = upload_image(file_bytes=raw, user_id=user.id)
-        user.avatar_url = uploaded["secure_url"]
+        try:
+            stored = store_image(
+                file_bytes=raw,
+                original_filename=file.filename or "avatar.jpg",
+                user_id=user.id,
+            )
+            user.avatar_url = _local_public_url(stored.get("file_url") or "")
+        except AppException:
+            raise
+        except Exception as exc:  # noqa: BLE001
+            raise AppException(
+                "Could not store avatar image. Check Cloudinary credentials or "
+                f"local upload directory ({settings.LOCAL_UPLOAD_DIR}).",
+                status_code=500,
+                code="avatar_storage_failed",
+                details=str(exc),
+            ) from exc
         db.add(user)
         db.commit()
         db.refresh(user)

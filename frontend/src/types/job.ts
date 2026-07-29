@@ -88,6 +88,8 @@ export type JobCreatePayload = {
   experience_min_years?: number
   experience_max_years?: number
   openings?: number
+  closes_at?: string | null
+  skills?: string[]
 }
 
 export type JobUpdatePayload = {
@@ -104,6 +106,8 @@ export type JobUpdatePayload = {
   experience_min_years?: number | null
   experience_max_years?: number | null
   openings?: number
+  closes_at?: string | null
+  skills?: string[]
 }
 
 export const EMPLOYMENT_TYPE_LABELS: Record<EmploymentType, string> = {

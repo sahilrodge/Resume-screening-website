@@ -1,13 +1,14 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import Link from "next/link"
 import { Building2, Plus } from "lucide-react"
 import { motion } from "framer-motion"
 
 import { DataToolbar } from "@/components/admin/data-toolbar"
 import { FadeIn, PageTransition } from "@/components/motion/page-transition"
 import { PageHeader } from "@/components/shared/page-header"
-import { Button } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import {
   Card,
   CardContent,
@@ -20,6 +21,7 @@ import { Label } from "@/components/ui/label"
 import { companiesApi } from "@/services/companies"
 import { ApiError } from "@/types/api"
 import type { Company } from "@/types/company"
+import { cn } from "@/lib/utils"
 
 export default function CompaniesPage() {
   const [query, setQuery] = useState("")
@@ -202,30 +204,67 @@ export default function CompaniesPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.05, duration: 0.35 }}
           >
-            <Card className="h-full border-border/70 bg-card/80 shadow-none backdrop-blur transition-all duration-300 hover:-translate-y-1 hover:border-primary/30">
-              <CardHeader className="flex flex-row items-start justify-between gap-3">
-                <div className="space-y-1">
-                  <CardTitle className="font-heading text-lg">{company.name}</CardTitle>
-                  <CardDescription>{company.industry || "Industry not set"}</CardDescription>
-                </div>
-                <span className="rounded-xl bg-primary/10 p-2 text-primary">
-                  <Building2 className="size-4" />
-                </span>
-              </CardHeader>
-              <CardContent className="space-y-3 text-sm">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-muted-foreground">Location</span>
-                  <span className="truncate text-right">{company.location || "—"}</span>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-muted-foreground">Website</span>
-                  <span className="truncate text-right">{company.website || "—"}</span>
-                </div>
-                {company.description ? (
-                  <p className="line-clamp-3 text-muted-foreground">{company.description}</p>
-                ) : null}
-              </CardContent>
-            </Card>
+            <Link href={`/companies/${company.id}`} className="block h-full">
+              <Card className="h-full border-border/70 bg-card/80 shadow-none backdrop-blur transition-all duration-300 hover:-translate-y-1 hover:border-primary/30">
+                <CardHeader className="flex flex-row items-start justify-between gap-3">
+                  <div className="flex items-start gap-3">
+                    {company.logo_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={company.logo_url}
+                        alt=""
+                        className="size-10 rounded-md border border-border bg-background object-contain p-1"
+                      />
+                    ) : (
+                      <span className="rounded-xl bg-primary/10 p-2 text-primary">
+                        <Building2 className="size-4" />
+                      </span>
+                    )}
+                    <div className="space-y-1">
+                      <CardTitle className="font-heading text-lg">
+                        {company.name}
+                      </CardTitle>
+                      <CardDescription>
+                        {company.industry || "Industry not set"}
+                      </CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-3 text-sm">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground">Headquarters</span>
+                    <span className="truncate text-right">
+                      {company.location || "—"}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground">Employees</span>
+                    <span className="truncate text-right">
+                      {company.employee_count || "—"}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground">Open jobs</span>
+                    <span className="truncate text-right">
+                      {company.open_jobs_count ?? 0}
+                    </span>
+                  </div>
+                  {company.description ? (
+                    <p className="line-clamp-3 text-muted-foreground">
+                      {company.description}
+                    </p>
+                  ) : null}
+                  <span
+                    className={cn(
+                      buttonVariants({ variant: "outline", size: "sm" }),
+                      "pointer-events-none"
+                    )}
+                  >
+                    View profile
+                  </span>
+                </CardContent>
+              </Card>
+            </Link>
           </motion.div>
         ))}
       </div>

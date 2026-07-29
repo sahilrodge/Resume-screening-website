@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from app.models.application import Application
     from app.models.company import Company
     from app.models.recruiter import Recruiter
+    from app.models.saved_job import SavedJob
     from app.models.skill import JobSkill
 
 
@@ -73,6 +74,11 @@ class Job(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     )
     skills: Mapped[list[JobSkill]] = relationship(
         "JobSkill",
+        back_populates="job",
+        cascade="all, delete-orphan",
+    )
+    saved_by: Mapped[list[SavedJob]] = relationship(
+        "SavedJob",
         back_populates="job",
         cascade="all, delete-orphan",
     )

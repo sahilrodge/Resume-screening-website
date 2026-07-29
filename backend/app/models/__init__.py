@@ -28,12 +28,15 @@ from app.models.push_subscription import PushSubscription
 from app.models.recruiter import Recruiter
 from app.models.refresh_token import RefreshToken
 from app.models.resume import Resume
+from app.models.saved_job import SavedJob
 from app.models.skill import CandidateSkill, JobSkill, Skill
 from app.models.user import User
+from app.models.user_settings import UserSettings
 
 __all__ = [
     "Base",
     "User",
+    "UserSettings",
     "UserRole",
     "RefreshToken",
     "Company",
@@ -41,6 +44,7 @@ __all__ = [
     "Recruiter",
     "Job",
     "Application",
+    "SavedJob",
     "Skill",
     "CandidateSkill",
     "JobSkill",

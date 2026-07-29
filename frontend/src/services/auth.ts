@@ -54,6 +54,16 @@ export const authApi = {
       { skipAuth: true, skipAuthRefresh: true }
     )
   },
+
+  logoutAll() {
+    return apiClient.post("/auth/logout-all", {})
+  },
+
+  deleteAccount(payload: { password: string; confirmation: "DELETE" }) {
+    return apiClient.delete<{ message: string }>("/auth/me", {
+      data: payload,
+    })
+  },
 }
 
 /** Auth service — session helpers on top of authApi */
@@ -100,13 +110,23 @@ export const authService = {
   },
 
   async logout(): Promise<void> {
-    const refreshToken = authStorage.getRefreshToken()
     try {
-      if (refreshToken) {
-        await authApi.logout(refreshToken)
+      // Revoke all refresh tokens when available; fall back to this device.
+      try {
+        await authApi.logoutAll()
+      } catch {
+        const refreshToken = authStorage.getRefreshToken()
+        if (refreshToken) {
+          await authApi.logout(refreshToken)
+        }
       }
     } finally {
       await authStorage.clear()
     }
+  },
+
+  async deleteAccount(password: string): Promise<void> {
+    await authApi.deleteAccount({ password, confirmation: "DELETE" })
+    await authStorage.clear()
   },
 }

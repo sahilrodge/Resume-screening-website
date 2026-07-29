@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import func, select, update
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.candidate import Candidate
 from app.models.enums import ResumeStatus
 from app.models.resume import Resume
+from app.models.user import User
 
 
 class CRUDResume:
@@ -26,6 +27,7 @@ class CRUDResume:
         db: Session,
         *,
         candidate_id: uuid.UUID | None = None,
+        search: str | None = None,
         skip: int = 0,
         limit: int = 50,
     ) -> tuple[list[Resume], int]:
@@ -33,7 +35,23 @@ class CRUDResume:
         if candidate_id:
             filters.append(Resume.candidate_id == candidate_id)
 
+        needs_user_join = False
+        if search and search.strip():
+            needs_user_join = True
+            term = f"%{search.strip().lower()}%"
+            filters.append(
+                or_(
+                    func.lower(Resume.file_name).like(term),
+                    func.lower(User.full_name).like(term),
+                    func.lower(User.email).like(term),
+                )
+            )
+
         count_stmt = select(func.count()).select_from(Resume)
+        if needs_user_join:
+            count_stmt = count_stmt.join(Candidate, Resume.candidate_id == Candidate.id).join(
+                User, Candidate.user_id == User.id
+            )
         if filters:
             count_stmt = count_stmt.where(*filters)
         total = db.scalar(count_stmt) or 0
@@ -41,6 +59,10 @@ class CRUDResume:
         stmt = select(Resume).options(
             joinedload(Resume.candidate).joinedload(Candidate.user)
         )
+        if needs_user_join:
+            stmt = stmt.join(Candidate, Resume.candidate_id == Candidate.id).join(
+                User, Candidate.user_id == User.id
+            )
         if filters:
             stmt = stmt.where(*filters)
         stmt = stmt.order_by(Resume.created_at.desc()).offset(skip).limit(limit)

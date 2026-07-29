@@ -20,9 +20,16 @@ export type TokenPair = {
   remember_me: boolean
 }
 
+export type EmailVerificationPlaceholder = {
+  status: "pending"
+  required: boolean
+  message: string
+}
+
 export type AuthResponse = {
   user: User
   tokens: TokenPair
+  email_verification?: EmailVerificationPlaceholder
 }
 
 export type LoginPayload = {
@@ -35,6 +42,9 @@ export type RegisterPayload = {
   email: string
   password: string
   full_name: string
-  role?: UserRole
+  confirm_password?: string
+  company_name?: string
+  job_title?: string
+  phone?: string
   remember_me?: boolean
 }

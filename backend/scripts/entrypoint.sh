@@ -12,6 +12,16 @@ if [ "${RUN_MIGRATIONS}" = "true" ]; then
   alembic upgrade head
 fi
 
+# Optional demo seed — disabled by default (never enable in production)
+if [ "${SEED_JOBS_IF_EMPTY:-false}" = "true" ]; then
+  if [ "${APP_ENV:-development}" = "production" ]; then
+    echo "Skipping job seed in production"
+  else
+    echo "Seeding Indian jobs if empty..."
+    python -m scripts.seed_indian_jobs --if-empty || echo "Job seed skipped"
+  fi
+fi
+
 # Single worker when concurrency is 1 (simpler debugging / free tiers)
 if [ "${WEB_CONCURRENCY}" = "1" ]; then
   exec uvicorn app.main:app \

@@ -9,6 +9,7 @@ from fastapi import APIRouter, Query, status
 
 from app.api.deps import CurrentUser, DBSession
 from app.schemas.assistant import (
+    AssistantStatusResponse,
     ChatReplyResponse,
     ConversationCreate,
     ConversationListResponse,
@@ -18,6 +19,15 @@ from app.schemas.assistant import (
 from app.services.assistant import assistant_service
 
 router = APIRouter(prefix="/assistant", tags=["assistant"])
+
+
+@router.get(
+    "/status",
+    response_model=AssistantStatusResponse,
+    summary="AI assistant configuration status",
+)
+def assistant_status(db: DBSession, user: CurrentUser) -> AssistantStatusResponse:
+    return assistant_service.status(db, user=user)
 
 
 @router.post(

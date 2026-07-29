@@ -50,4 +50,22 @@ export const jobsApi = {
       params: toQuery(params),
     })
   },
+
+  listSaved(params: { page?: number; page_size?: number } = {}) {
+    return apiClient.get<JobListResponse>("/jobs/saved", {
+      params: toQuery(params),
+    })
+  },
+
+  savedIds() {
+    return apiClient.get<{ job_ids: string[] }>("/jobs/saved/ids")
+  },
+
+  save(jobId: string) {
+    return apiClient.post<{ id: string; job_id: string }>(`/jobs/${jobId}/save`, {})
+  },
+
+  unsave(jobId: string) {
+    return apiClient.delete<{ message: string }>(`/jobs/${jobId}/save`)
+  },
 }

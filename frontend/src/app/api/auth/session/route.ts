@@ -1,7 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server"
 
 import {
-  SESSION_BROWSER_MAX_AGE_SECONDS,
   SESSION_COOKIE,
   SESSION_REMEMBER_MAX_AGE_SECONDS,
   buildSessionPayload,
@@ -23,19 +22,38 @@ function isSecureRequest(request: NextRequest) {
   return request.nextUrl.protocol === "https:"
 }
 
-function sessionCookieOptions(secure: boolean, maxAge: number) {
-  return {
+function sessionCookieOptions(
+  secure: boolean,
+  maxAge?: number
+): {
+  httpOnly: boolean
+  secure: boolean
+  sameSite: "lax"
+  path: string
+  maxAge?: number
+} {
+  const options: {
+    httpOnly: boolean
+    secure: boolean
+    sameSite: "lax"
+    path: string
+    maxAge?: number
+  } = {
     httpOnly: true,
     secure,
-    sameSite: "lax" as const,
+    sameSite: "lax",
     path: "/",
-    maxAge,
   }
+  // Omit maxAge for browser-session cookies (cleared when the browser closes).
+  if (typeof maxAge === "number") {
+    options.maxAge = maxAge
+  }
+  return options
 }
 
 type SessionBody = {
   remember_me?: boolean
-  max_age_seconds?: number
+  max_age_seconds?: number | null
 }
 
 /**
@@ -87,16 +105,16 @@ export async function POST(request: NextRequest) {
   }
 
   const rememberMe = Boolean(body.remember_me)
-  const maxAge =
-    typeof body.max_age_seconds === "number" && body.max_age_seconds > 0
+  const maxAge = rememberMe
+    ? typeof body.max_age_seconds === "number" && body.max_age_seconds > 0
       ? body.max_age_seconds
-      : rememberMe
-        ? SESSION_REMEMBER_MAX_AGE_SECONDS
-        : SESSION_BROWSER_MAX_AGE_SECONDS
+      : SESSION_REMEMBER_MAX_AGE_SECONDS
+    : undefined
 
   const value = await signSessionCookie(
     buildSessionPayload(user.role, user.id, {
-      maxAgeSeconds: maxAge,
+      // Cookie payload expiry: remember uses long TTL; session uses 1 day absolute max.
+      maxAgeSeconds: maxAge ?? 60 * 60 * 24,
       email: user.email,
       full_name: user.full_name,
       remember_me: rememberMe,

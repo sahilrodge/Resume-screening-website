@@ -18,9 +18,8 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { analyticsApi } from "@/services/analytics"
-import { usersApi } from "@/services/users"
+import { usersApi, type AdminUser } from "@/services/users"
 import type { RecruiterPerformanceItem } from "@/types/analytics"
-import type { User } from "@/types/auth"
 import { ApiError } from "@/types/api"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -55,7 +54,7 @@ export default function RecruitersPage() {
     for (const item of analytics?.recruiter_performance ?? []) {
       if (item.user_id) perfByUserId.set(item.user_id, item)
     }
-    const mapped: RecruiterRow[] = usersRes.items.map((user: User) => {
+    const mapped: RecruiterRow[] = usersRes.items.map((user: AdminUser) => {
       const perf = perfByUserId.get(user.id)
       return {
         id: user.id,

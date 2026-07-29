@@ -1,15 +1,24 @@
 """Authentication endpoints: register, login, refresh, me, logout."""
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Request, status
 
 from app.api.deps import CurrentUser, DBSession
 from app.core.exceptions import UnauthorizedError
+from app.core.rate_limit import enforce_auth_rate_limit
 from app.core.security import verify_password
 from app.crud.user import user as user_crud
-from app.schemas.auth import AuthResponse, LogoutRequest, RefreshRequest, TokenResponse
+from app.schemas.auth import (
+    AuthResponse,
+    LogoutRequest,
+    RefreshRequest,
+    RegisterRequest,
+    TokenResponse,
+)
 from app.schemas.common import MessageResponse
-from app.schemas.user import UserCreate, UserLogin, UserResponse, UserUpdateMe
+from app.schemas.settings import DeleteAccountRequest
+from app.schemas.user import UserLogin, UserResponse, UserUpdateMe
 from app.services.auth import auth_service
+from app.services.settings import settings_service
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -18,10 +27,17 @@ router = APIRouter(prefix="/auth", tags=["auth"])
     "/register",
     response_model=AuthResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Register a new user",
+    summary="Register a candidate account (public)",
 )
-def register(payload: UserCreate, db: DBSession) -> AuthResponse:
-    """Create a user (role: admin | recruiter | candidate) and return JWT tokens."""
+def register(payload: RegisterRequest, db: DBSession, request: Request) -> AuthResponse:
+    """Create a candidate account. Recruiter/Admin signup is not allowed publicly."""
+    enforce_auth_rate_limit(
+        request,
+        action="register",
+        identity=str(payload.email),
+        limit=5,
+        window_seconds=60,
+    )
     return auth_service.register(db, data=payload)
 
 
@@ -30,8 +46,15 @@ def register(payload: UserCreate, db: DBSession) -> AuthResponse:
     response_model=AuthResponse,
     summary="Login",
 )
-def login(payload: UserLogin, db: DBSession) -> AuthResponse:
+def login(payload: UserLogin, db: DBSession, request: Request) -> AuthResponse:
     """Authenticate with email/password and return JWT tokens."""
+    enforce_auth_rate_limit(
+        request,
+        action="login",
+        identity=str(payload.email),
+        limit=10,
+        window_seconds=60,
+    )
     return auth_service.login(db, data=payload)
 
 
@@ -40,8 +63,14 @@ def login(payload: UserLogin, db: DBSession) -> AuthResponse:
     response_model=TokenResponse,
     summary="Refresh access token",
 )
-def refresh(payload: RefreshRequest, db: DBSession) -> TokenResponse:
+def refresh(payload: RefreshRequest, db: DBSession, request: Request) -> TokenResponse:
     """Rotate refresh token and issue a new access/refresh pair."""
+    enforce_auth_rate_limit(
+        request,
+        action="refresh",
+        limit=30,
+        window_seconds=60,
+    )
     return auth_service.refresh(
         db,
         refresh_token=payload.refresh_token,
@@ -90,6 +119,34 @@ def update_me(
     summary="Logout",
 )
 def logout(payload: LogoutRequest, db: DBSession) -> MessageResponse:
-    """Revoke all refresh tokens for the user (full session destroy)."""
+    """Revoke the presented refresh token for this device/session."""
     auth_service.logout(db, refresh_token=payload.refresh_token)
     return MessageResponse(message="Logged out successfully")
+
+
+@router.post(
+    "/logout-all",
+    response_model=MessageResponse,
+    summary="Logout all devices",
+)
+def logout_all(db: DBSession, current_user: CurrentUser) -> MessageResponse:
+    """Revoke every refresh token for the authenticated user."""
+    auth_service.logout_all(db, user_id=current_user.id)
+    return MessageResponse(message="Logged out from all devices")
+
+
+@router.delete(
+    "/me",
+    response_model=MessageResponse,
+    summary="Delete my account",
+)
+def delete_me(
+    payload: DeleteAccountRequest,
+    db: DBSession,
+    current_user: CurrentUser,
+) -> MessageResponse:
+    """Permanently delete the authenticated account after password confirmation."""
+    settings_service.delete_account(
+        db, current_user, password=payload.password
+    )
+    return MessageResponse(message="Account deleted successfully")

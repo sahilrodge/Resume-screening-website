@@ -122,7 +122,7 @@ export function CandidateFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
+      <DialogContent className="sm:max-w-xl">
         <DialogHeader>
           <DialogTitle className="font-heading">
             {mode === "create" ? "Add candidate" : "Edit candidate"}

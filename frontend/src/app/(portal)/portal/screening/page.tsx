@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { Download } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { PageSkeleton } from "@/components/shared/page-skeleton"
 import { applicationsApi } from "@/services/applications"
 import type { ApplicationMatch } from "@/types/application"
 import { ApiError } from "@/types/api"
@@ -55,9 +56,7 @@ export default function PortalScreeningPage() {
         </p>
       </header>
 
-      {loading ? (
-        <p className="text-sm text-muted-foreground">Loading…</p>
-      ) : null}
+      {loading ? <PageSkeleton withHeader={false} rows={4} /> : null}
       {error ? (
         <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
           {error}

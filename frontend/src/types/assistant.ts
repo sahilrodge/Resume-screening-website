@@ -1,5 +1,7 @@
 export type ChatRole = "user" | "assistant" | "system"
 
+export type AssistantMode = "candidate" | "recruiter" | "admin"
+
 export type AssistantMessage = {
   id: string
   conversation_id: string
@@ -17,6 +19,7 @@ export type AssistantConversation = {
   candidate_name: string | null
   job_id: string | null
   job_title: string | null
+  company_name?: string | null
   application_id: string | null
   created_at: string
   updated_at: string
@@ -32,6 +35,7 @@ export type ChatReplyResponse = {
   conversation: AssistantConversation
   reply: AssistantMessage
   action_result: Record<string, unknown> | null
+  follow_ups: string[]
 }
 
 export type ConversationCreatePayload = {
@@ -39,4 +43,11 @@ export type ConversationCreatePayload = {
   candidate_id?: string
   job_id?: string
   application_id?: string
+}
+
+export type AssistantStatus = {
+  configured: boolean
+  model: string | null
+  mode: AssistantMode
+  message: string
 }

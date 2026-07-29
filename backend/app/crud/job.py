@@ -15,7 +15,7 @@ from app.models.company import Company
 from app.models.enums import EmploymentType, JobStatus
 from app.models.job import Job
 from app.models.recruiter import Recruiter
-from app.models.skill import JobSkill
+from app.models.skill import JobSkill, Skill
 from app.schemas.job import JobCreate, JobSortField, JobUpdate, SortOrder
 
 
@@ -28,13 +28,58 @@ def _base_query() -> Select[tuple[Job]]:
     )
 
 
+def _normalize_skill_names(names: list[str] | None) -> list[str]:
+    cleaned: list[str] = []
+    seen: set[str] = set()
+    for raw in names or []:
+        name = (raw or "").strip()
+        if not name:
+            continue
+        key = name.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        cleaned.append(name)
+    return cleaned
+
+
 class CRUDJob:
     def get(self, db: Session, job_id: uuid.UUID) -> Job | None:
         stmt = _base_query().where(Job.id == job_id)
         return db.scalars(stmt).unique().first()
 
+    def _get_or_create_skill(self, db: Session, name: str) -> Skill:
+        existing = db.scalar(
+            select(Skill).where(func.lower(Skill.name) == name.lower())
+        )
+        if existing is not None:
+            return existing
+        skill = Skill(name=name)
+        db.add(skill)
+        db.flush()
+        return skill
+
+    def _sync_skills(self, db: Session, *, job: Job, skill_names: list[str]) -> None:
+        names = _normalize_skill_names(skill_names)
+        desired: dict[str, Skill] = {}
+        for name in names:
+            skill = self._get_or_create_skill(db, name)
+            desired[str(skill.id)] = skill
+
+        existing_links = list(job.skills or [])
+        keep_ids = set(desired.keys())
+        for link in existing_links:
+            if str(link.skill_id) not in keep_ids:
+                db.delete(link)
+
+        existing_ids = {str(link.skill_id) for link in existing_links}
+        for skill_id, skill in desired.items():
+            if skill_id not in existing_ids:
+                db.add(JobSkill(job_id=job.id, skill_id=skill.id, is_required=True))
+
     def create(self, db: Session, *, obj_in: JobCreate) -> Job:
         data = obj_in.model_dump()
+        skill_names = data.pop("skills", []) or []
         status = data.get("status", JobStatus.DRAFT)
         published_at = None
         if status == JobStatus.OPEN:
@@ -42,11 +87,14 @@ class CRUDJob:
 
         job = Job(**data, published_at=published_at)
         db.add(job)
+        db.flush()
+        self._sync_skills(db, job=job, skill_names=skill_names)
         db.commit()
         return self.get(db, job.id)  # type: ignore[return-value]
 
     def update(self, db: Session, *, db_obj: Job, obj_in: JobUpdate) -> Job:
         data = obj_in.model_dump(exclude_unset=True)
+        skill_names = data.pop("skills", None)
         previous_status = db_obj.status
 
         for field, value in data.items():
@@ -56,6 +104,9 @@ class CRUDJob:
         if new_status == JobStatus.OPEN and previous_status != JobStatus.OPEN:
             if db_obj.published_at is None:
                 db_obj.published_at = datetime.now(timezone.utc)
+
+        if skill_names is not None:
+            self._sync_skills(db, job=db_obj, skill_names=skill_names)
 
         db.add(db_obj)
         db.commit()
@@ -84,12 +135,23 @@ class CRUDJob:
 
         if search:
             term = f"%{search.strip().lower()}%"
+            skill_match = (
+                select(JobSkill.id)
+                .join(Skill, Skill.id == JobSkill.skill_id)
+                .where(
+                    JobSkill.job_id == Job.id,
+                    func.lower(Skill.name).like(term),
+                )
+                .correlate(Job)
+                .exists()
+            )
             filters.append(
                 or_(
                     func.lower(Job.title).like(term),
                     func.lower(Job.description).like(term),
                     func.lower(Job.location).like(term),
                     func.lower(Company.name).like(term),
+                    skill_match,
                 )
             )
 

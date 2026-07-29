@@ -89,7 +89,7 @@ export default function PortalHomePage() {
             AI Assistant
           </div>
           <p className="text-sm text-muted-foreground">
-            Ask questions about roles and next steps
+            Ask about resume tips, interviews, careers, and jobs
           </p>
         </Link>
       </section>
@@ -99,7 +99,7 @@ export default function PortalHomePage() {
         <p className="text-sm text-muted-foreground">
           {profile?.headline ||
             profile?.current_title ||
-            "Complete your profile in Settings."}
+            "Complete your profile to improve job matches."}
         </p>
         <p className="text-sm text-muted-foreground">
           {profile?.location || "Location not set"}

@@ -117,12 +117,23 @@ def register_exception_handlers(app: FastAPI) -> None:
         exc: RequestValidationError,
     ) -> JSONResponse:
         request_id = getattr(request.state, "request_id", None)
+
+        def _json_safe(value: Any) -> Any:
+            if isinstance(value, BaseException):
+                return str(value)
+            if isinstance(value, dict):
+                return {k: _json_safe(v) for k, v in value.items()}
+            if isinstance(value, (list, tuple)):
+                return [_json_safe(v) for v in value]
+            return value
+
+        details = _json_safe(exc.errors())
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             content=_error_body(
                 code="validation_error",
                 message="Request validation failed",
-                details=exc.errors(),
+                details=details,
                 request_id=request_id,
             ),
         )
@@ -135,7 +146,7 @@ def register_exception_handlers(app: FastAPI) -> None:
             content=_error_body(
                 code="invalid_token",
                 message="Could not validate credentials",
-                details=str(exc),
+                details=None,
                 request_id=request_id,
             ),
             headers={"WWW-Authenticate": "Bearer"},

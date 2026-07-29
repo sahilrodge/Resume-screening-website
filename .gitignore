@@ -24,3 +24,9 @@ out/
 
 # Docker volumes / logs
 *.log
+
+# Local uploads / go-live artifacts
+backend/uploads/
+**/uploads/
+backend/.env.golive-credentials
+

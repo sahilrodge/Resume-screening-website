@@ -33,11 +33,24 @@ export async function toApiError(error: unknown): Promise<ApiError> {
       message = "Unable to reach the server. Check your connection."
     }
 
+    const details = data?.error?.details ?? data?.detail
+    if (
+      data?.error?.code === "validation_error" &&
+      Array.isArray(details) &&
+      details.length > 0
+    ) {
+      const first = details[0] as { msg?: string }
+      if (typeof first?.msg === "string" && first.msg) {
+        // Pydantic model errors are often "Value error, Passwords do not match"
+        message = first.msg.replace(/^Value error,\s*/i, "")
+      }
+    }
+
     return new ApiError(
       message,
       status,
       data?.error?.code,
-      data?.error?.details ?? data?.detail
+      details
     )
   }
 

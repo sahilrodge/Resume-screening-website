@@ -42,16 +42,32 @@ export async function middleware(request: NextRequest) {
     const url = request.nextUrl.clone()
     url.pathname = "/login"
     url.searchParams.set("next", pathname)
-    return NextResponse.redirect(url)
+    const redirect = NextResponse.redirect(url)
+    redirect.headers.set(
+      "Cache-Control",
+      "no-store, no-cache, must-revalidate, private"
+    )
+    return redirect
   }
 
   if (!canAccessPath(role, pathname)) {
     const url = request.nextUrl.clone()
     url.pathname = homeForRole(role)
-    return NextResponse.redirect(url)
+    const redirect = NextResponse.redirect(url)
+    redirect.headers.set(
+      "Cache-Control",
+      "no-store, no-cache, must-revalidate, private"
+    )
+    return redirect
   }
 
-  return NextResponse.next()
+  const response = NextResponse.next()
+  response.headers.set(
+    "Cache-Control",
+    "no-store, no-cache, must-revalidate, private"
+  )
+  response.headers.set("Pragma", "no-cache")
+  return response
 }
 
 export const config = {

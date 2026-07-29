@@ -141,7 +141,10 @@ export function MatchResultPanel({ result }: { result: ApplicationMatch }) {
             <p className="text-xs text-muted-foreground">Applicant Tracking Score</p>
           </div>
           <p className="text-xs text-muted-foreground">
-            {result.job_title || "Role"} · {result.candidate_name || "Candidate"}
+            {result.company_name
+              ? `${result.company_name} - ${result.job_title || "Role"}`
+              : result.job_title || "Role"}{" "}
+            · {result.candidate_name || "Candidate"}
           </p>
         </div>
 
@@ -207,7 +210,7 @@ export function MatchResultPanel({ result }: { result: ApplicationMatch }) {
 
           <div className="grid gap-5 sm:grid-cols-2">
             <BulletList
-              title="Strengths"
+              title="Candidate Strengths"
               icon={
                 <span className="flex size-6 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
                   <ThumbsUp className="size-3.5" />

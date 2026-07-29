@@ -24,6 +24,8 @@ export const jobCreateSchema = z
     experience_min_years: z.string().optional(),
     experience_max_years: z.string().optional(),
     openings: z.string().optional(),
+    closes_at: z.string().optional(),
+    skills: z.string().optional(),
   })
   .superRefine((data, ctx) => {
     const salaryMin = data.salary_min?.trim()
@@ -106,6 +108,22 @@ function optionalNumber(value?: string) {
   return Number(trimmed)
 }
 
+function parseSkills(value?: string) {
+  if (!value?.trim()) return []
+  return value
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean)
+}
+
+function toClosesAtIso(value?: string) {
+  const trimmed = value?.trim()
+  if (!trimmed) return undefined
+  const date = new Date(`${trimmed}T23:59:59`)
+  if (Number.isNaN(date.getTime())) return undefined
+  return date.toISOString()
+}
+
 export function toCreatePayload(values: JobCreateValues) {
   return {
     company_id: values.company_id,
@@ -120,6 +138,8 @@ export function toCreatePayload(values: JobCreateValues) {
     experience_min_years: optionalNumber(values.experience_min_years),
     experience_max_years: optionalNumber(values.experience_max_years),
     openings: optionalNumber(values.openings) ?? 1,
+    closes_at: toClosesAtIso(values.closes_at),
+    skills: parseSkills(values.skills),
   }
 }
 
@@ -137,5 +157,7 @@ export function toUpdatePayload(values: JobUpdateValues) {
     experience_min_years: optionalNumber(values.experience_min_years) ?? null,
     experience_max_years: optionalNumber(values.experience_max_years) ?? null,
     openings: optionalNumber(values.openings) ?? 1,
+    closes_at: toClosesAtIso(values.closes_at) ?? null,
+    skills: parseSkills(values.skills),
   }
 }

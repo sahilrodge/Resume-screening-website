@@ -78,58 +78,94 @@ def _heuristic_ats_score(resume_payload: str, job_description: str) -> float:
     return max(0.0, min(100.0, round(score, 2)))
 
 
+def _heuristic_match(
+    *,
+    job_title: str,
+    job_description: str,
+    resume_payload: str,
+) -> MatchResult:
+    """Local keyword overlap match used when OpenAI is unavailable."""
+    resume = resume_payload.lower()
+    job = f"{job_title}\n{job_description}".lower()
+    tokens = sorted(
+        {
+            t
+            for t in re.findall(r"[a-zA-Z][a-zA-Z0-9+.#-]{2,}", job)
+            if len(t) > 3 and t not in {
+                "with", "from", "that", "this", "have", "will", "your", "about",
+                "into", "their", "them", "than", "then", "also", "such", "able",
+            }
+        }
+    )
+    matching = [t for t in tokens if t in resume][:20]
+    missing = [t for t in tokens if t not in resume][:20]
+    coverage = (len(matching) / max(1, len(tokens))) if tokens else 0.35
+    match_score = round(max(15.0, min(95.0, coverage * 100)), 2)
+    ats_score = _heuristic_ats_score(resume_payload, job_description)
+    return MatchResult(
+        match_score=match_score,
+        ats_score=ats_score,
+        matching_skills=matching[:12],
+        missing_skills=missing[:12],
+        strengths=[
+            f"Evidence of {s}" for s in matching[:4]
+        ] or ["Resume content available for review"],
+        weaknesses=[
+            f"Limited evidence of {s}" for s in missing[:4]
+        ] or ["Add more role-specific keywords"],
+        suggestions=[
+            "Mirror key skills from the job description in a Skills section",
+            "Add measurable achievements under recent roles",
+            "Ensure job titles and keywords appear near the top of the resume",
+        ],
+        summary=(
+            f"Heuristic match for “{job_title}”: about {int(match_score)}% keyword "
+            f"overlap with the job description. OpenAI scoring was unavailable, "
+            f"so this is a local estimate."
+        ),
+        reasoning=(
+            f"Matched {len(matching)} of {len(tokens)} job keywords. "
+            f"ATS estimate is {ats_score}."
+        ),
+    )
+
+
 def compare_resume_to_job(
     *,
     job_title: str,
     job_description: str,
     resume_payload: str,
 ) -> MatchResult:
-    """Call OpenAI to score resume fit and ATS quality against a job."""
-    if not settings.OPENAI_API_KEY:
-        raise AppException(
-            "OpenAI is not configured. Set OPENAI_API_KEY in .env",
-            status_code=503,
-            code="openai_not_configured",
+    """Score resume fit and ATS quality against a job (OpenAI with local fallback)."""
+    if settings.openai_configured:
+        client = OpenAI(api_key=settings.OPENAI_API_KEY)
+        user_content = (
+            f"JOB TITLE:\n{job_title}\n\n"
+            f"JOB DESCRIPTION:\n{job_description[:12000]}\n\n"
+            f"RESUME DATA:\n{resume_payload[:12000]}"
         )
+        try:
+            completion = client.chat.completions.create(
+                model=settings.OPENAI_MODEL,
+                temperature=0.2,
+                response_format={"type": "json_object"},
+                messages=[
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": user_content},
+                ],
+            )
+            content = completion.choices[0].message.content or "{}"
+            payload = json.loads(content)
+            if payload.get("ats_score") in (None, ""):
+                payload["ats_score"] = _heuristic_ats_score(
+                    resume_payload, job_description
+                )
+            return MatchResult.model_validate(payload)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("OpenAI job match failed; using heuristic match: %s", exc)
 
-    client = OpenAI(api_key=settings.OPENAI_API_KEY)
-    user_content = (
-        f"JOB TITLE:\n{job_title}\n\n"
-        f"JOB DESCRIPTION:\n{job_description[:12000]}\n\n"
-        f"RESUME DATA:\n{resume_payload[:12000]}"
+    return _heuristic_match(
+        job_title=job_title,
+        job_description=job_description,
+        resume_payload=resume_payload,
     )
-
-    try:
-        completion = client.chat.completions.create(
-            model=settings.OPENAI_MODEL,
-            temperature=0.2,
-            response_format={"type": "json_object"},
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": user_content},
-            ],
-        )
-    except Exception as exc:  # noqa: BLE001
-        logger.exception("OpenAI job match failed")
-        raise AppException(
-            "OpenAI resume matching failed",
-            status_code=502,
-            code="openai_match_failed",
-            details=str(exc),
-        ) from exc
-
-    content = completion.choices[0].message.content or "{}"
-    try:
-        payload = json.loads(content)
-    except json.JSONDecodeError as exc:
-        raise AppException(
-            "OpenAI returned invalid JSON for match result",
-            status_code=502,
-            code="openai_invalid_json",
-            details=content[:500],
-        ) from exc
-
-    if payload.get("ats_score") in (None, ""):
-        payload["ats_score"] = _heuristic_ats_score(resume_payload, job_description)
-
-    return MatchResult.model_validate(payload)

@@ -17,40 +17,71 @@ from app.core.security import (
     verify_token,
 )
 from app.crud.candidate import candidate as candidate_crud
+from app.crud.company import company as company_crud
 from app.crud.refresh_token import refresh_token as refresh_token_crud
 from app.crud.user import user as user_crud
 from app.models.candidate import Candidate
 from app.models.enums import UserRole
 from app.models.recruiter import Recruiter
 from app.models.user import User
-from app.schemas.auth import AuthResponse, TokenResponse
+from app.schemas.auth import (
+    AuthResponse,
+    EmailVerificationPlaceholder,
+    RegisterRequest,
+    TokenResponse,
+)
+from app.schemas.company import CompanyCreate
 from app.schemas.user import UserCreate, UserLogin, UserResponse
 
 
 class AuthService:
-    def register(self, db: Session, *, data: UserCreate) -> AuthResponse:
-        if user_crud.get_by_email(db, data.email):
+    def register(self, db: Session, *, data: RegisterRequest) -> AuthResponse:
+        # Public registration is candidate-only. Staff accounts are admin-provisioned.
+        if user_crud.get_by_email(db, str(data.email)):
             raise ConflictError("Email already registered")
 
-        # Public self-registration is candidate-only; staff via admin invite
-        if data.role != UserRole.CANDIDATE:
-            raise ForbiddenError(
-                "Public registration is limited to candidate accounts. "
-                "Ask an administrator to invite staff users."
-            )
-
-        user = user_crud.create(db, obj_in=data)
+        user = user_crud.create(
+            db,
+            obj_in=UserCreate(
+                email=data.email,
+                password=data.password,
+                full_name=data.full_name,
+                role=UserRole.CANDIDATE,
+            ),
+        )
         self._ensure_role_profile(db, user)
-        tokens = self._issue_tokens(db, user, remember_me=False)
-        return AuthResponse(user=UserResponse.model_validate(user), tokens=tokens)
+        tokens = self._issue_tokens(db, user, remember_me=bool(data.remember_me))
+        return AuthResponse(
+            user=UserResponse.model_validate(user),
+            tokens=tokens,
+            email_verification=EmailVerificationPlaceholder(),
+        )
 
-    def _ensure_role_profile(self, db: Session, user: User) -> None:
+    def _get_or_create_company(self, db: Session, name: str):
+        cleaned = name.strip()
+        if not cleaned:
+            raise ConflictError("Company name is required")
+        existing = company_crud.get_by_name(db, cleaned)
+        if existing is not None:
+            return existing
+        return company_crud.create(db, obj_in=CompanyCreate(name=cleaned))
+
+    def _ensure_role_profile(
+        self,
+        db: Session,
+        user: User,
+        *,
+        company_id: uuid.UUID | None = None,
+        job_title: str | None = None,
+        phone: str | None = None,
+    ) -> None:
         """Create the linked Candidate/Recruiter row for the user role."""
         if user.role == UserRole.CANDIDATE:
             if candidate_crud.get_by_user_id(db, user.id) is None:
                 db.add(Candidate(user_id=user.id))
                 db.commit()
             return
+
         if user.role == UserRole.RECRUITER:
             from sqlalchemy import select
 
@@ -58,8 +89,26 @@ class AuthService:
                 select(Recruiter).where(Recruiter.user_id == user.id)
             ).first()
             if existing is None:
-                db.add(Recruiter(user_id=user.id, company_id=None))
-                db.commit()
+                db.add(
+                    Recruiter(
+                        user_id=user.id,
+                        company_id=company_id,
+                        job_title=job_title,
+                        phone=phone,
+                    )
+                )
+            else:
+                if company_id is not None:
+                    existing.company_id = company_id
+                if job_title is not None:
+                    existing.job_title = job_title
+                if phone is not None:
+                    existing.phone = phone
+                db.add(existing)
+            db.commit()
+            return
+
+        # Admin has no separate profile table; company is bootstrapped above.
 
     def login(self, db: Session, *, data: UserLogin) -> AuthResponse:
         user = user_crud.get_by_email(db, data.email)
@@ -67,6 +116,13 @@ class AuthService:
             raise UnauthorizedError("Incorrect email or password")
         if not user.is_active:
             raise ForbiddenError("User account is inactive")
+
+        from datetime import datetime, timezone
+
+        user.last_login = datetime.now(timezone.utc)
+        db.add(user)
+        db.commit()
+        db.refresh(user)
 
         tokens = self._issue_tokens(db, user, remember_me=data.remember_me)
         return AuthResponse(user=UserResponse.model_validate(user), tokens=tokens)
@@ -126,6 +182,10 @@ class AuthService:
         jti = payload.get("jti")
         if jti:
             refresh_token_crud.revoke_by_jti(db, jti)
+
+    def logout_all(self, db: Session, *, user_id: uuid.UUID) -> None:
+        """Revoke every refresh token for the user (all devices)."""
+        refresh_token_crud.revoke_all_for_user(db, user_id)
 
     def _issue_tokens(
         self,

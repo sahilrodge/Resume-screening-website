@@ -43,7 +43,7 @@ export const candidateNav: NavItem[] = [
     title: "AI Assistant",
     href: "/portal/assistant",
     icon: Bot,
-    description: "Ask about roles and hiring process",
+    description: "Resume tips, interview prep, and career advice",
   },
   {
     title: "Jobs",
@@ -113,7 +113,7 @@ export const recruiterNav: NavItem[] = [
     title: "AI Assistant",
     href: "/assistant",
     icon: Bot,
-    description: "Ask about roles and schedule interviews",
+    description: "Hiring Q&A and interview scheduling",
   },
   {
     title: "Interviews",
@@ -201,7 +201,7 @@ export const adminNav: NavItem[] = [
     title: "AI Assistant",
     href: "/assistant",
     icon: Bot,
-    description: "Ask about roles and schedule interviews",
+    description: "Hiring Q&A and interview scheduling",
   },
   {
     title: "Interviews",

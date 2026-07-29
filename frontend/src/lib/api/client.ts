@@ -76,6 +76,7 @@ api.interceptors.response.use(
         typeof window !== "undefined" &&
         !window.location.pathname.startsWith("/login")
       ) {
+        await authStorage.clear().catch(() => undefined)
         window.location.href = "/login"
       }
     }

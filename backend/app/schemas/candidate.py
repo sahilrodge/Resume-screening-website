@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
+from decimal import Decimal
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
@@ -17,6 +18,7 @@ class CandidateCreate(BaseModel):
     full_name: str = Field(min_length=1, max_length=255)
     phone: str | None = Field(default=None, max_length=30)
     location: str | None = Field(default=None, max_length=255)
+    date_of_birth: date | None = None
     headline: str | None = Field(default=None, max_length=255)
     summary: str | None = None
     years_experience: int | None = Field(default=None, ge=0, le=80)
@@ -24,6 +26,9 @@ class CandidateCreate(BaseModel):
     github_url: str | None = Field(default=None, max_length=500)
     portfolio_url: str | None = Field(default=None, max_length=500)
     current_title: str | None = Field(default=None, max_length=255)
+    preferred_job_role: str | None = Field(default=None, max_length=255)
+    preferred_location: str | None = Field(default=None, max_length=255)
+    expected_salary: Decimal | None = Field(default=None, ge=0)
 
     @field_validator("full_name")
     @classmethod
@@ -38,6 +43,7 @@ class CandidateUpdate(BaseModel):
     full_name: str | None = Field(default=None, min_length=1, max_length=255)
     phone: str | None = Field(default=None, max_length=30)
     location: str | None = Field(default=None, max_length=255)
+    date_of_birth: date | None = None
     headline: str | None = Field(default=None, max_length=255)
     summary: str | None = None
     years_experience: int | None = Field(default=None, ge=0, le=80)
@@ -45,6 +51,9 @@ class CandidateUpdate(BaseModel):
     github_url: str | None = Field(default=None, max_length=500)
     portfolio_url: str | None = Field(default=None, max_length=500)
     current_title: str | None = Field(default=None, max_length=255)
+    preferred_job_role: str | None = Field(default=None, max_length=255)
+    preferred_location: str | None = Field(default=None, max_length=255)
+    expected_salary: Decimal | None = Field(default=None, ge=0)
     is_active: bool | None = None
     skills: list[str] | None = None
     education: list[EducationItem] | None = None
@@ -66,11 +75,12 @@ class CandidateResponse(BaseModel):
 
     id: uuid.UUID
     user_id: uuid.UUID
-    email: EmailStr
+    email: EmailStr | None = None
     full_name: str
     is_active: bool
     phone: str | None = None
     location: str | None = None
+    date_of_birth: date | None = None
     headline: str | None = None
     summary: str | None = None
     years_experience: int | None = None
@@ -78,18 +88,23 @@ class CandidateResponse(BaseModel):
     github_url: str | None = None
     portfolio_url: str | None = None
     current_title: str | None = None
+    preferred_job_role: str | None = None
+    preferred_location: str | None = None
+    expected_salary: Decimal | None = None
     created_at: datetime
     updated_at: datetime
 
 
 class CandidateProfileResponse(CandidateResponse):
-    """Candidate detail including latest OpenAI-parsed resume fields."""
+    """Candidate detail including latest primary resume fields."""
 
     skills: list[str] = Field(default_factory=list)
     education: list[EducationItem] = Field(default_factory=list)
     experience: list[ExperienceItem] = Field(default_factory=list)
     resume_id: uuid.UUID | None = None
+    resume_file_name: str | None = None
     resume_status: str | None = None
+    resume_uploaded_at: datetime | None = None
     parsed_data: ParsedResumeData | None = None
 
 

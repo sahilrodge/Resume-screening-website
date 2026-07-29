@@ -5,6 +5,7 @@ import { Bell } from "lucide-react"
 
 import { notificationsApi } from "@/services/notifications"
 import type { AppNotification } from "@/types/notification"
+import { PageSkeleton } from "@/components/shared/page-skeleton"
 import { Button } from "@/components/ui/button"
 
 function formatWhen(iso: string) {
@@ -56,7 +57,7 @@ export default function PortalNotificationsPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <header className="flex items-start justify-between gap-4">
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="space-y-1">
           <h1 className="font-heading text-2xl font-semibold tracking-tight">
             Notifications
@@ -66,15 +67,13 @@ export default function PortalNotificationsPage() {
           </p>
         </div>
         {unread > 0 ? (
-          <Button variant="outline" size="sm" onClick={() => void markAll()}>
+          <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => void markAll()}>
             Mark all read
           </Button>
         ) : null}
       </header>
 
-      {loading ? (
-        <p className="text-sm text-muted-foreground">Loading…</p>
-      ) : null}
+      {loading ? <PageSkeleton withHeader={false} rows={5} /> : null}
       {error ? (
         <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
           {error}

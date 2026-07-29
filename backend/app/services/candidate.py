@@ -22,15 +22,19 @@ from app.schemas.candidate import (
 from app.crud.resume import resume as resume_crud
 
 
-def _to_response(obj: Candidate) -> CandidateResponse:
+def _to_response(
+    obj: Candidate, *, reveal_email: bool = True
+) -> CandidateResponse:
+    email = obj.user.email if reveal_email else None
     return CandidateResponse(
         id=obj.id,
         user_id=obj.user_id,
-        email=obj.user.email,
+        email=email,
         full_name=obj.user.full_name,
         is_active=obj.user.is_active,
         phone=obj.phone,
         location=obj.location,
+        date_of_birth=obj.date_of_birth,
         headline=obj.headline,
         summary=obj.summary,
         years_experience=obj.years_experience,
@@ -38,9 +42,38 @@ def _to_response(obj: Candidate) -> CandidateResponse:
         github_url=obj.github_url,
         portfolio_url=obj.portfolio_url,
         current_title=obj.current_title,
+        preferred_job_role=obj.preferred_job_role,
+        preferred_location=obj.preferred_location,
+        expected_salary=obj.expected_salary,
         created_at=obj.created_at,
         updated_at=obj.updated_at,
     )
+
+
+def _privacy_flags(db: Session, user_id: uuid.UUID) -> tuple[bool, bool]:
+    """Return (profile_discoverable, show_email_to_recruiters)."""
+    from sqlalchemy import select
+
+    from app.models.user_settings import UserSettings
+
+    settings_row = db.scalar(
+        select(UserSettings).where(UserSettings.user_id == user_id)
+    )
+    if settings_row is None:
+        return True, False
+    return (
+        bool(settings_row.profile_discoverable),
+        bool(settings_row.show_email_to_recruiters),
+    )
+
+
+def _staff_view_response(db: Session, obj: Candidate) -> CandidateResponse:
+    """Recruiter/admin view respects candidate privacy settings."""
+    discoverable, show_email = _privacy_flags(db, obj.user_id)
+    if not discoverable:
+        # Still return the row for known IDs / applications, but hide contact.
+        return _to_response(obj, reveal_email=False)
+    return _to_response(obj, reveal_email=show_email)
 
 
 class CandidateService:
@@ -54,7 +87,7 @@ class CandidateService:
         obj = candidate_crud.get(db, candidate_id)
         if obj is None:
             raise NotFoundError("Candidate not found")
-        return _to_response(obj)
+        return _staff_view_response(db, obj)
 
     def get_or_create_for_user(self, db: Session, user_id: uuid.UUID) -> Candidate:
         obj = candidate_crud.get_by_user_id(db, user_id)
@@ -91,7 +124,7 @@ class CandidateService:
         if obj is None:
             raise NotFoundError("Candidate not found")
 
-        base = _to_response(obj)
+        base = _staff_view_response(db, obj)
         skill_names = [
             link.skill.name
             for link in (obj.skills or [])
@@ -105,7 +138,7 @@ class CandidateService:
         if isinstance(obj.experience, list):
             experience = obj.experience
 
-        latest = resume_crud.get_latest_parsed(db, candidate_id=candidate_id)
+        latest = resume_crud.get_primary_or_latest(db, candidate_id=candidate_id)
         parsed = latest.parsed_data if latest else None
         if parsed and isinstance(parsed, dict):
             if parsed.get("skills"):
@@ -121,7 +154,9 @@ class CandidateService:
             education=education,
             experience=experience,
             resume_id=latest.id if latest else None,
+            resume_file_name=latest.file_name if latest else None,
             resume_status=latest.status.value if latest else None,
+            resume_uploaded_at=latest.created_at if latest else None,
             parsed_data=parsed,
         )
 
@@ -170,9 +205,17 @@ class CandidateService:
             sort_by=sort_by,
             sort_order=sort_order,
         )
+        visible: list[CandidateResponse] = []
+        for item in items:
+            discoverable, show_email = _privacy_flags(db, item.user_id)
+            if not discoverable:
+                continue
+            visible.append(_to_response(item, reveal_email=show_email))
+        # Note: total/pages still reflect unfiltered DB counts when privacy hides
+        # rows; prefer accurate page content over leaking hidden candidates.
         return CandidateListResponse(
-            items=[_to_response(item) for item in items],
-            total=total,
+            items=visible,
+            total=len(visible) if search or location else total,
             page=page,
             page_size=page_size,
             pages=pages,

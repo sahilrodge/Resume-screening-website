@@ -43,6 +43,7 @@ class ConversationResponse(BaseModel):
     candidate_name: str | None = None
     job_id: uuid.UUID | None = None
     job_title: str | None = None
+    company_name: str | None = None
     application_id: uuid.UUID | None = None
     created_at: datetime
     updated_at: datetime
@@ -58,6 +59,7 @@ class ChatReplyResponse(BaseModel):
     conversation: ConversationResponse
     reply: AssistantMessageResponse
     action_result: dict[str, Any] | None = None
+    follow_ups: list[str] = Field(default_factory=list)
 
 
 class ScheduleInterviewAction(BaseModel):
@@ -70,11 +72,8 @@ class ScheduleInterviewAction(BaseModel):
     location: str | None = None
 
 
-class ScheduleInterviewAction(BaseModel):
-    type: Literal["schedule_interview"] = "schedule_interview"
-    application_id: uuid.UUID | None = None
-    scheduled_at: datetime | None = None
-    interview_type: str = "video"
-    duration_minutes: int = 60
-    meeting_link: str | None = None
-    location: str | None = None
+class AssistantStatusResponse(BaseModel):
+    configured: bool
+    model: str | None = None
+    mode: Literal["candidate", "recruiter", "admin"]
+    message: str

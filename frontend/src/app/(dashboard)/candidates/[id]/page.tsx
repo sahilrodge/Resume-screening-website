@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
+import { LatestResumePanel } from "@/features/resumes/latest-resume-panel"
 import { useApiLoading } from "@/hooks/use-api-loading"
 import { candidatesApi } from "@/services/candidates"
 import { ApiError } from "@/types/api"
@@ -117,6 +118,23 @@ export default function CandidateProfilePage() {
           </FadeIn>
 
           <Separator />
+
+          <FadeIn>
+            <LatestResumePanel
+              mode="staff-readonly"
+              title="Latest resume"
+              description="Primary resume used for screening, apply, and AI assistant context."
+              resume={{
+                id: profile.resume_id,
+                fileName: profile.resume_file_name ?? null,
+                status: profile.resume_status,
+                uploadedAt: profile.resume_uploaded_at ?? null,
+              }}
+              onMessage={(message, kind) => {
+                if (kind === "error") setError(message)
+              }}
+            />
+          </FadeIn>
 
           <FadeIn>
             <section className="space-y-3">

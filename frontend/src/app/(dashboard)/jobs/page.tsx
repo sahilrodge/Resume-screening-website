@@ -20,6 +20,13 @@ import { Badge } from "@/components/ui/badge"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
   Table,
   TableBody,
   TableCell,
@@ -67,6 +74,14 @@ export default function JobsPage() {
   const [dialogMode, setDialogMode] = useState<"create" | "edit">("create")
   const [selected, setSelected] = useState<Job | null>(null)
   const [submitting, setSubmitting] = useState(false)
+
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search).get("q")
+    if (q) {
+      setSearch(q)
+      setDebouncedSearch(q.trim())
+    }
+  }, [])
 
   useEffect(() => {
     const id = window.setTimeout(() => setDebouncedSearch(search.trim()), 350)
@@ -283,31 +298,41 @@ export default function JobsPage() {
                 onChange={(e) => setLocation(e.target.value)}
                 className="lg:max-w-[10rem]"
               />
-              <select
-                className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm"
+              <Select
                 value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as "all" | JobStatus)}
-              >
-                <option value="all">All statuses</option>
-                <option value="draft">Draft</option>
-                <option value="open">Open</option>
-                <option value="closed">Closed</option>
-                <option value="filled">Filled</option>
-              </select>
-              <select
-                className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm"
-                value={typeFilter}
-                onChange={(e) =>
-                  setTypeFilter(e.target.value as "all" | EmploymentType)
+                onValueChange={(value) =>
+                  setStatusFilter((value ?? "all") as "all" | JobStatus)
                 }
               >
-                <option value="all">All types</option>
-                <option value="full_time">Full-time</option>
-                <option value="part_time">Part-time</option>
-                <option value="contract">Contract</option>
-                <option value="internship">Internship</option>
-                <option value="remote">Remote</option>
-              </select>
+                <SelectTrigger className="w-full sm:w-[9.5rem]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All statuses</SelectItem>
+                  <SelectItem value="draft">Draft</SelectItem>
+                  <SelectItem value="open">Open</SelectItem>
+                  <SelectItem value="closed">Closed</SelectItem>
+                  <SelectItem value="filled">Filled</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select
+                value={typeFilter}
+                onValueChange={(value) =>
+                  setTypeFilter((value ?? "all") as "all" | EmploymentType)
+                }
+              >
+                <SelectTrigger className="w-full sm:w-[9.5rem]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All types</SelectItem>
+                  <SelectItem value="full_time">Full-time</SelectItem>
+                  <SelectItem value="part_time">Part-time</SelectItem>
+                  <SelectItem value="contract">Contract</SelectItem>
+                  <SelectItem value="internship">Internship</SelectItem>
+                  <SelectItem value="remote">Remote</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           }
         >
@@ -370,7 +395,16 @@ export default function JobsPage() {
                       </Link>
                     </TableCell>
                     <TableCell className="hidden md:table-cell">
-                      {row.company_name || "—"}
+                      {row.company_id ? (
+                        <Link
+                          href={`/companies/${row.company_id}`}
+                          className="hover:underline"
+                        >
+                          {row.company_name || "—"}
+                        </Link>
+                      ) : (
+                        row.company_name || "—"
+                      )}
                     </TableCell>
                     <TableCell className="hidden lg:table-cell">
                       <Badge variant="outline">

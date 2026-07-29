@@ -133,6 +133,18 @@ class CRUDNotification:
         db.commit()
         return len(items)
 
+    def clear_all(self, db: Session, *, user_id: uuid.UUID) -> int:
+        items = list(
+            db.scalars(
+                select(Notification).where(Notification.user_id == user_id)
+            ).all()
+        )
+        count = len(items)
+        for item in items:
+            db.delete(item)
+        db.commit()
+        return count
+
     def channel_counts(self, db: Session, *, user_id: uuid.UUID) -> dict[str, int]:
         rows = db.execute(
             select(Notification.channel, func.count().label("count"))

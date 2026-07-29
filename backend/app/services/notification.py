@@ -104,6 +104,10 @@ class NotificationService:
         notification_crud.mark_all_read(db, user_id=user.id)
         return self.unread_count(db, user=user)
 
+    def clear_all(self, db: Session, *, user: User) -> UnreadCountResponse:
+        notification_crud.clear_all(db, user_id=user.id)
+        return self.unread_count(db, user=user)
+
     def get_preferences(self, db: Session, *, user: User) -> NotificationPreferenceResponse:
         pref = preference_crud.get_or_create(db, user_id=user.id)
         return NotificationPreferenceResponse(

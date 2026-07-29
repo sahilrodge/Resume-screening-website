@@ -6,7 +6,9 @@ export default function RegisterPage() {
     <Card className="border-border/70 bg-card/90 shadow-none backdrop-blur">
       <CardHeader>
         <CardTitle className="font-heading">Create account</CardTitle>
-        <CardDescription>Connect to the recruitment API and get started</CardDescription>
+        <CardDescription>
+          Create a Candidate account to apply for jobs and manage your resume
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <RegisterForm />

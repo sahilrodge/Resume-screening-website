@@ -1,11 +1,16 @@
 """Application settings loaded from environment variables."""
 
 from functools import lru_cache
+from pathlib import Path
 from typing import Annotated, Literal
 from urllib.parse import urlparse
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
+
+# Always resolve backend/.env relative to this package (not process cwd).
+_BACKEND_ROOT = Path(__file__).resolve().parents[2]
+_ENV_FILE = _BACKEND_ROOT / ".env"
 
 
 def _split_csv(value: object) -> object:
@@ -30,11 +35,20 @@ def _normalize_origin(origin: str) -> str:
     return origin.strip().rstrip("/")
 
 
+def _empty_str_to_none(value: object) -> object:
+    """Treat blank env values as unset."""
+    if isinstance(value, str) and not value.strip():
+        return None
+    if isinstance(value, str):
+        return value.strip()
+    return value
+
+
 class Settings(BaseSettings):
     """Central configuration for the FastAPI application."""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=str(_ENV_FILE),
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
@@ -56,6 +70,13 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_REMEMBER_DAYS: int = 30
     # Back-compat alias used by older code paths
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
+    # Idle timeout for browser sessions (minutes). 0 disables.
+    IDLE_TIMEOUT_MINUTES: int = 30
+
+    # Permanent Super Admin (bootstrapped on startup; protected from delete/demote/suspend)
+    SUPER_ADMIN_EMAIL: str = "sahilrodge4@gmail.com"
+    SUPER_ADMIN_FULL_NAME: str = "Super Admin"
+    SUPER_ADMIN_PASSWORD: str | None = None
 
     # Database
     DATABASE_URL: str = Field(
@@ -92,16 +113,19 @@ class Settings(BaseSettings):
         default_factory=lambda: ["/api/v1/health", "/api/v1/health/ready", "/"]
     )
 
-    # OpenAI
+    # OpenAI (resume parsing / matching / assistant) — set OPENAI_API_KEY in backend/.env
     OPENAI_API_KEY: str | None = None
     OPENAI_MODEL: str = "gpt-4o-mini"
 
-    # Cloudinary (resume storage)
+    # Cloudinary (resume storage) — optional; falls back to local uploads/ in development
     CLOUDINARY_CLOUD_NAME: str | None = None
     CLOUDINARY_API_KEY: str | None = None
     CLOUDINARY_API_SECRET: str | None = None
     CLOUDINARY_FOLDER: str = "hirepulse/resumes"
     MAX_RESUME_SIZE_MB: int = 10
+    LOCAL_UPLOAD_DIR: str = "uploads"
+    # Optional absolute public API origin for local file URLs, e.g. http://127.0.0.1:8000
+    PUBLIC_API_URL: str | None = None
 
     # Email (SMTP)
     SMTP_HOST: str | None = None
@@ -125,6 +149,25 @@ class Settings(BaseSettings):
         return value
 
     @field_validator(
+        "OPENAI_API_KEY",
+        "CLOUDINARY_CLOUD_NAME",
+        "CLOUDINARY_API_KEY",
+        "CLOUDINARY_API_SECRET",
+        "SUPER_ADMIN_PASSWORD",
+        "SMTP_HOST",
+        "SMTP_USERNAME",
+        "SMTP_PASSWORD",
+        "SMTP_FROM_EMAIL",
+        "VAPID_PUBLIC_KEY",
+        "VAPID_PRIVATE_KEY",
+        "PUBLIC_API_URL",
+        mode="before",
+    )
+    @classmethod
+    def blank_optional_secrets(cls, value: object) -> object:
+        return _empty_str_to_none(value)
+
+    @field_validator(
         "CORS_ORIGINS",
         "CORS_ALLOW_METHODS",
         "CORS_ALLOW_HEADERS",
@@ -145,12 +188,28 @@ class Settings(BaseSettings):
         return self.APP_ENV == "production"
 
     @property
+    def openai_configured(self) -> bool:
+        return bool(self.OPENAI_API_KEY)
+
+    @property
     def cloudinary_configured(self) -> bool:
+        """True when all three Cloudinary credentials are present (non-blank)."""
         return bool(
-            self.CLOUDINARY_CLOUD_NAME
-            and self.CLOUDINARY_API_KEY
-            and self.CLOUDINARY_API_SECRET
+            (self.CLOUDINARY_CLOUD_NAME or "").strip()
+            and (self.CLOUDINARY_API_KEY or "").strip()
+            and (self.CLOUDINARY_API_SECRET or "").strip()
         )
+
+    def cloudinary_missing_vars(self) -> list[str]:
+        missing: list[str] = []
+        if not (self.CLOUDINARY_CLOUD_NAME or "").strip():
+            missing.append("CLOUDINARY_CLOUD_NAME")
+        if not (self.CLOUDINARY_API_KEY or "").strip():
+            missing.append("CLOUDINARY_API_KEY")
+        if not (self.CLOUDINARY_API_SECRET or "").strip():
+            missing.append("CLOUDINARY_API_SECRET")
+        return missing
+
 
     @property
     def smtp_configured(self) -> bool:

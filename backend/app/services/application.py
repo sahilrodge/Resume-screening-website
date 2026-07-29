@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import uuid
+from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
@@ -25,6 +26,7 @@ from app.schemas.application import (
     SortOrder,
 )
 from app.services.notification import notification_service
+from app.services.resume import resume_service
 
 
 def _as_str_list(value: object) -> list[str]:
@@ -90,9 +92,18 @@ class ApplicationService:
         resume = resume_crud.get(db, data.resume_id)
         if resume is None:
             raise NotFoundError("Resume not found")
-        if resume.status != ResumeStatus.PARSED and not resume.parsed_data and not resume.raw_text:
+
+        # Auto re-extract / re-parse failed uploads before matching.
+        resume = resume_service.ensure_ready(db, resume_id=resume.id)
+
+        if (
+            resume.status != ResumeStatus.PARSED
+            and not resume.parsed_data
+            and not resume.raw_text
+        ):
             raise AppException(
-                "Resume must be parsed before matching",
+                "Resume must be parsed before matching. Re-upload the resume and "
+                "wait until status is Parsed.",
                 status_code=400,
                 code="resume_not_ready",
             )
@@ -166,6 +177,16 @@ class ApplicationService:
                 status_code=400,
                 code="job_not_open",
             )
+        if job.closes_at is not None:
+            deadline = job.closes_at
+            if deadline.tzinfo is None:
+                deadline = deadline.replace(tzinfo=UTC)
+            if datetime.now(UTC) > deadline:
+                raise AppException(
+                    "The application deadline for this job has passed",
+                    status_code=400,
+                    code="job_closed",
+                )
 
         existing = application_crud.get_by_job_candidate(
             db, job_id=job.id, candidate_id=candidate_id

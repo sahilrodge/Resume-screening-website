@@ -33,7 +33,7 @@ export type ParsedResumeData = {
 export type Candidate = {
   id: string
   user_id: string
-  email: string
+  email: string | null
   full_name: string
   is_active: boolean
   phone: string | null
@@ -54,7 +54,9 @@ export type CandidateProfile = Candidate & {
   education?: EducationItem[]
   experience?: ExperienceItem[]
   resume_id: string | null
+  resume_file_name?: string | null
   resume_status: string | null
+  resume_uploaded_at?: string | null
   parsed_data: ParsedResumeData | null
 }
 

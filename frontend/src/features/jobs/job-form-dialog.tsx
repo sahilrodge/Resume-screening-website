@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { useForm } from "react-hook-form"
+import { Controller, useForm } from "react-hook-form"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -15,6 +15,13 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import {
   jobCreateSchema,
   jobUpdateSchema,
@@ -51,6 +58,8 @@ const defaultValues: JobCreateValues = {
   experience_min_years: "",
   experience_max_years: "",
   openings: "1",
+  closes_at: "",
+  skills: "",
 }
 
 export function JobFormDialog({
@@ -114,6 +123,10 @@ export function JobFormDialog({
           experience_max_years:
             job.experience_max_years != null ? String(job.experience_max_years) : "",
           openings: String(job.openings ?? 1),
+          closes_at: job.closes_at
+            ? new Date(job.closes_at).toISOString().slice(0, 10)
+            : "",
+          skills: (job.skills ?? []).join(", "),
         })
       }
     })
@@ -155,7 +168,7 @@ export function JobFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
+      <DialogContent className="sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>{mode === "create" ? "Create job" : "Update job"}</DialogTitle>
           <DialogDescription>
@@ -171,25 +184,53 @@ export function JobFormDialog({
         >
           <div className="grid gap-2">
             <Label htmlFor="company_id">Company</Label>
-            <select
-              id="company_id"
-              className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-              {...form.register("company_id")}
-            >
-              <option value="">Select company</option>
-              {companies.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
+            <Controller
+              control={form.control}
+              name="company_id"
+              render={({ field }) => {
+                const companyItems = [
+                  { value: "__none__", label: "Select company" },
+                  ...companies.map((c) => ({ value: c.id, label: c.name })),
+                ]
+                return (
+                  <Select
+                    value={field.value || "__none__"}
+                    onValueChange={(value) =>
+                      field.onChange(!value || value === "__none__" ? "" : value)
+                    }
+                    items={companyItems}
+                  >
+                    <SelectTrigger id="company_id" className="w-full">
+                      <SelectValue placeholder="Select company">
+                        {(value) => {
+                          if (!value || value === "__none__") return null
+                          return (
+                            companies.find((c) => c.id === value)?.name || null
+                          )
+                        }}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__" label="Select company">
+                        Select company
+                      </SelectItem>
+                      {companies.map((c) => (
+                        <SelectItem key={c.id} value={c.id} label={c.name}>
+                          {c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )
+              }}
+            />
             {form.formState.errors.company_id ? (
               <p className="text-xs text-destructive">
                 {form.formState.errors.company_id.message}
               </p>
             ) : null}
 
-            <div className="flex gap-2 pt-1">
+            <div className="flex flex-col gap-2 pt-1 sm:flex-row">
               <Input
                 placeholder="Or create company…"
                 value={newCompanyName}
@@ -246,30 +287,54 @@ export function JobFormDialog({
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="grid gap-2">
               <Label htmlFor="employment_type">Employment type</Label>
-              <select
-                id="employment_type"
-                className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm"
-                {...form.register("employment_type")}
-              >
-                <option value="full_time">Full-time</option>
-                <option value="part_time">Part-time</option>
-                <option value="contract">Contract</option>
-                <option value="internship">Internship</option>
-                <option value="remote">Remote</option>
-              </select>
+              <Controller
+                control={form.control}
+                name="employment_type"
+                render={({ field }) => (
+                  <Select
+                    value={field.value}
+                    onValueChange={(value) => {
+                      if (value) field.onChange(value)
+                    }}
+                  >
+                    <SelectTrigger id="employment_type" className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="full_time">Full-time</SelectItem>
+                      <SelectItem value="part_time">Part-time</SelectItem>
+                      <SelectItem value="contract">Contract</SelectItem>
+                      <SelectItem value="internship">Internship</SelectItem>
+                      <SelectItem value="remote">Remote</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+              />
             </div>
             <div className="grid gap-2">
               <Label htmlFor="status">Status</Label>
-              <select
-                id="status"
-                className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm"
-                {...form.register("status")}
-              >
-                <option value="draft">Draft</option>
-                <option value="open">Open</option>
-                <option value="closed">Closed</option>
-                <option value="filled">Filled</option>
-              </select>
+              <Controller
+                control={form.control}
+                name="status"
+                render={({ field }) => (
+                  <Select
+                    value={field.value}
+                    onValueChange={(value) => {
+                      if (value) field.onChange(value)
+                    }}
+                  >
+                    <SelectTrigger id="status" className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="draft">Draft</SelectItem>
+                      <SelectItem value="open">Open</SelectItem>
+                      <SelectItem value="closed">Closed</SelectItem>
+                      <SelectItem value="filled">Filled</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+              />
             </div>
           </div>
 
@@ -296,6 +361,21 @@ export function JobFormDialog({
             <div className="grid gap-2">
               <Label htmlFor="experience_max_years">Exp max (years)</Label>
               <Input id="experience_max_years" {...form.register("experience_max_years")} />
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-2">
+              <Label htmlFor="closes_at">Application deadline</Label>
+              <Input id="closes_at" type="date" {...form.register("closes_at")} />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="skills">Skills (comma-separated)</Label>
+              <Input
+                id="skills"
+                placeholder="Python, React, SQL"
+                {...form.register("skills")}
+              />
             </div>
           </div>
 

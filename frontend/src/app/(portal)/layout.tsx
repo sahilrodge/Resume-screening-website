@@ -22,7 +22,7 @@ export default function PortalLayout({
       <AppSidebar />
       <SidebarInset className="min-h-svh">
         <AppNavbar />
-        <div className="flex-1 px-4 py-6 md:px-6">{children}</div>
+        <div className="flex-1 px-4 py-5 sm:py-6 md:px-6 lg:px-8">{children}</div>
       </SidebarInset>
     </SidebarProvider>
   )

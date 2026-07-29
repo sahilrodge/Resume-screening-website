@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, String
+from sqlalchemy import Boolean, DateTime, String
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -20,6 +21,7 @@ if TYPE_CHECKING:
     from app.models.push_subscription import PushSubscription
     from app.models.recruiter import Recruiter
     from app.models.refresh_token import RefreshToken
+    from app.models.user_settings import UserSettings
 
 
 class User(Base, UUIDPrimaryKeyMixin, TimestampMixin):
@@ -38,6 +40,9 @@ class User(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     avatar_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    last_login: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     refresh_tokens: Mapped[list[RefreshToken]] = relationship(
         "RefreshToken",
@@ -70,6 +75,12 @@ class User(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     push_subscriptions: Mapped[list[PushSubscription]] = relationship(
         "PushSubscription",
         back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    settings: Mapped[UserSettings | None] = relationship(
+        "UserSettings",
+        back_populates="user",
+        uselist=False,
         cascade="all, delete-orphan",
     )
     interviews_conducted: Mapped[list[Interview]] = relationship(

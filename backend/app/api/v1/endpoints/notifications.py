@@ -7,7 +7,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Query, status
 
-from app.api.deps import CurrentUser, DBSession
+from app.api.deps import AdminUser, CurrentUser, DBSession
 from app.models.enums import NotificationChannel, NotificationType
 from app.schemas.common import MessageResponse
 from app.schemas.notification import (
@@ -66,6 +66,17 @@ def unread_count(db: DBSession, current_user: CurrentUser) -> UnreadCountRespons
 )
 def mark_all_read(db: DBSession, current_user: CurrentUser) -> UnreadCountResponse:
     return notification_service.mark_all_read(db, user=current_user)
+
+
+@router.delete(
+    "/clear",
+    response_model=UnreadCountResponse,
+    summary="Delete all notifications for the current user",
+)
+def clear_notifications(
+    db: DBSession, current_user: CurrentUser
+) -> UnreadCountResponse:
+    return notification_service.clear_all(db, user=current_user)
 
 
 @router.get(
@@ -140,7 +151,7 @@ def push_unsubscribe(
 def test_notify(
     payload: NotifyTestRequest,
     db: DBSession,
-    current_user: CurrentUser,
+    current_user: AdminUser,
 ) -> list[NotificationResponse]:
     return notification_service.notify(
         db,

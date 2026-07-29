@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
+from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
@@ -20,8 +21,10 @@ class ProfileUpdate(BaseModel):
     """Role-aware profile update. Unused fields for a role are ignored."""
 
     full_name: str | None = Field(default=None, min_length=1, max_length=255)
+    email: EmailStr | None = None
     phone: str | None = Field(default=None, max_length=30)
     location: str | None = Field(default=None, max_length=255)
+    date_of_birth: date | None = None
     headline: str | None = Field(default=None, max_length=255)
     summary: str | None = None
     years_experience: int | None = Field(default=None, ge=0, le=80)
@@ -29,6 +32,9 @@ class ProfileUpdate(BaseModel):
     linkedin_url: str | None = Field(default=None, max_length=500)
     github_url: str | None = Field(default=None, max_length=500)
     portfolio_url: str | None = Field(default=None, max_length=500)
+    preferred_job_role: str | None = Field(default=None, max_length=255)
+    preferred_location: str | None = Field(default=None, max_length=255)
+    expected_salary: Decimal | None = Field(default=None, ge=0)
     skills: list[str] | None = None
     education: list[EducationItem] | None = None
     experience: list[ExperienceItem] | None = None
@@ -49,6 +55,22 @@ class ProfileUpdate(BaseModel):
         if not cleaned:
             raise ValueError("cannot be empty")
         return cleaned
+
+    @field_validator(
+        "phone",
+        "location",
+        "headline",
+        "summary",
+        "current_title",
+        "preferred_job_role",
+        "preferred_location",
+        mode="before",
+    )
+    @classmethod
+    def empty_text_to_none(cls, value: object) -> object:
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
 
     @field_validator("skills")
     @classmethod
@@ -80,6 +102,25 @@ class ProfileUpdate(BaseModel):
             return None
         return value
 
+    @field_validator("expected_salary", mode="before")
+    @classmethod
+    def empty_salary_to_none(cls, value: object) -> object:
+        if value is None or value == "":
+            return None
+        return value
+
+    @field_validator("date_of_birth")
+    @classmethod
+    def validate_dob(cls, value: date | None) -> date | None:
+        if value is None:
+            return value
+        today = date.today()
+        if value > today:
+            raise ValueError("date_of_birth cannot be in the future")
+        if value.year < 1920:
+            raise ValueError("date_of_birth is unrealistically old")
+        return value
+
     @model_validator(mode="after")
     def password_pair(self) -> ProfileUpdate:
         if self.new_password and not self.current_password:
@@ -99,6 +140,7 @@ class ProfileResponse(BaseModel):
     phone: str | None = None
     # Candidate
     location: str | None = None
+    date_of_birth: date | None = None
     headline: str | None = None
     summary: str | None = None
     years_experience: int | None = None
@@ -106,12 +148,16 @@ class ProfileResponse(BaseModel):
     linkedin_url: str | None = None
     github_url: str | None = None
     portfolio_url: str | None = None
+    preferred_job_role: str | None = None
+    preferred_location: str | None = None
+    expected_salary: Decimal | None = None
     skills: list[str] = Field(default_factory=list)
     education: list[EducationItem] = Field(default_factory=list)
     experience: list[ExperienceItem] = Field(default_factory=list)
     resume_id: uuid.UUID | None = None
     resume_file_name: str | None = None
     resume_status: str | None = None
+    resume_uploaded_at: datetime | None = None
     # Recruiter
     company_id: uuid.UUID | None = None
     company_name: str | None = None

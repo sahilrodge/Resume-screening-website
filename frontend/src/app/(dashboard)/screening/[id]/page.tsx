@@ -103,10 +103,14 @@ export default function ScreeningDetailPage() {
       <PageHeader
         title={
           result
-            ? `${result.candidate_name ?? "Candidate"} vs ${result.job_title ?? "Job"}`
+            ? `${result.candidate_name ?? "Candidate"} · ${
+                result.company_name
+                  ? `${result.company_name} - ${result.job_title ?? "Job"}`
+                  : result.job_title ?? "Job"
+              }`
             : "Match details"
         }
-        description="ATS score, job match, strengths, gaps, and actionable resume suggestions"
+        description="ATS score, missing skills, candidate strengths, and resume suggestions"
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <Link href="/screening" className={buttonVariants({ variant: "outline" })}>

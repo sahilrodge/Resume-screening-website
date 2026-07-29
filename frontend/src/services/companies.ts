@@ -3,6 +3,8 @@ import type {
   Company,
   CompanyCreatePayload,
   CompanyListResponse,
+  CompanyProfile,
+  CompanyUpdatePayload,
 } from "@/types/company"
 
 export const companiesApi = {
@@ -12,7 +14,15 @@ export const companiesApi = {
     })
   },
 
+  get(id: string) {
+    return apiClient.get<CompanyProfile>(`/companies/${id}`)
+  },
+
   create(payload: CompanyCreatePayload) {
     return apiClient.post<Company>("/companies", payload)
+  },
+
+  update(id: string, payload: CompanyUpdatePayload) {
+    return apiClient.patch<Company>(`/companies/${id}`, payload)
   },
 }

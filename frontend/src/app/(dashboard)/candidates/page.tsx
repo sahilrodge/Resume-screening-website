@@ -20,6 +20,13 @@ import { PageHeader } from "@/components/shared/page-header"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
   Table,
   TableBody,
   TableCell,
@@ -299,29 +306,41 @@ export default function CandidatesPage() {
                 onChange={(e) => setMaxExperience(e.target.value)}
                 placeholder="Max years"
               />
-              <select
+              <Select
                 value={activeFilter}
-                onChange={(e) =>
-                  setActiveFilter(e.target.value as "all" | "active" | "inactive")
+                onValueChange={(value) =>
+                  setActiveFilter(
+                    (value ?? "all") as "all" | "active" | "inactive"
+                  )
                 }
-                className="flex h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm"
               >
-                <option value="all">All statuses</option>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </select>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All statuses</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
               <div className="flex items-center gap-2 lg:col-span-2">
-                <select
+                <Select
                   value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as CandidateSortField)}
-                  className="flex h-8 flex-1 rounded-lg border border-input bg-transparent px-2.5 text-sm"
+                  onValueChange={(value) => {
+                    if (value) setSortBy(value as CandidateSortField)
+                  }}
                 >
-                  {sortOptions.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      Sort: {opt.label}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger className="min-w-0 flex-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {sortOptions.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        Sort: {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <Button
                   variant="outline"
                   size="icon"

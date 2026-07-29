@@ -197,19 +197,32 @@ export default function JobDetailsPage() {
               <div className="flex items-start gap-2">
                 <Building2 className="mt-0.5 size-4 text-muted-foreground" />
                 <div className="flex items-center gap-3">
-                  {job.company_logo_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={job.company_logo_url}
-                      alt={job.company_name ?? "Company"}
-                      className="size-10 rounded-lg border border-border object-contain bg-background p-1"
-                    />
-                  ) : null}
+                  <Link href={`/companies/${job.company_id}`} className="shrink-0">
+                    {job.company_logo_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={job.company_logo_url}
+                        alt={job.company_name ?? "Company"}
+                        className="size-10 rounded-lg border border-border object-contain bg-background p-1"
+                      />
+                    ) : (
+                      <span className="inline-flex size-10 items-center justify-center rounded-lg border border-border bg-muted/40">
+                        <Building2 className="size-4 text-muted-foreground" />
+                      </span>
+                    )}
+                  </Link>
                   <div>
                     <p className="text-xs uppercase tracking-wide text-muted-foreground">
                       Company
                     </p>
-                    <p className="font-medium">{job.company_name || "—"}</p>
+                    <p className="font-medium">
+                      <Link
+                        href={`/companies/${job.company_id}`}
+                        className="underline-offset-4 hover:underline"
+                      >
+                        {job.company_name || "—"}
+                      </Link>
+                    </p>
                   </div>
                 </div>
               </div>
@@ -274,7 +287,9 @@ export default function JobDetailsPage() {
             <section className="space-y-2">
               <h2 className="font-heading text-lg font-semibold">Description</h2>
               <p className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
-                {job.description.replace(/\s*<!-- seed:indian_jobs_v1 -->\s*/g, "").trim()}
+                {(job.description ?? "")
+                  .replace(/\s*<!-- seed:indian_jobs_v1 -->\s*/g, "")
+                  .trim() || "No description provided."}
               </p>
             </section>
           </FadeIn>

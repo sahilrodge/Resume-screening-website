@@ -38,12 +38,15 @@ class CRUDUser:
         *,
         db_obj: User,
         full_name: str | None = None,
+        email: str | None = None,
         role: UserRole | None = None,
         is_active: bool | None = None,
         password: str | None = None,
     ) -> User:
         if full_name is not None:
             db_obj.full_name = full_name.strip()
+        if email is not None:
+            db_obj.email = email.strip().lower()
         if role is not None:
             db_obj.role = role
         if is_active is not None:
@@ -54,6 +57,10 @@ class CRUDUser:
         db.commit()
         db.refresh(db_obj)
         return db_obj
+
+    def delete(self, db: Session, *, db_obj: User) -> None:
+        db.delete(db_obj)
+        db.commit()
 
 
 user = CRUDUser()

@@ -25,6 +25,8 @@ class JobCreate(BaseModel):
     experience_min_years: int | None = Field(default=None, ge=0, le=80)
     experience_max_years: int | None = Field(default=None, ge=0, le=80)
     openings: int = Field(default=1, ge=1, le=1000)
+    closes_at: datetime | None = None
+    skills: list[str] = Field(default_factory=list)
 
     @field_validator("title")
     @classmethod
@@ -65,6 +67,8 @@ class JobUpdate(BaseModel):
     experience_min_years: int | None = Field(default=None, ge=0, le=80)
     experience_max_years: int | None = Field(default=None, ge=0, le=80)
     openings: int | None = Field(default=None, ge=1, le=1000)
+    closes_at: datetime | None = None
+    skills: list[str] | None = None
 
     @field_validator("title")
     @classmethod

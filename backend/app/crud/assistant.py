@@ -96,6 +96,8 @@ class CRUDAssistant:
         content: str,
         meta: dict[str, Any] | None = None,
     ) -> AssistantMessage:
+        from datetime import datetime, timezone
+
         msg = AssistantMessage(
             conversation_id=conversation_id,
             role=role,
@@ -103,9 +105,9 @@ class CRUDAssistant:
             meta=meta,
         )
         db.add(msg)
-        # bump conversation updated_at
         conv = db.get(AssistantConversation, conversation_id)
         if conv:
+            conv.updated_at = datetime.now(timezone.utc)
             db.add(conv)
         db.commit()
         db.refresh(msg)
@@ -117,6 +119,13 @@ class CRUDAssistant:
             conv.title = title[:255]
             db.add(conv)
             db.commit()
+
+    def delete_message(self, db: Session, message_id: uuid.UUID) -> None:
+        msg = db.get(AssistantMessage, message_id)
+        if msg is None:
+            return
+        db.delete(msg)
+        db.commit()
 
 
 assistant = CRUDAssistant()

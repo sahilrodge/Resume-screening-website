@@ -10,7 +10,11 @@ let refreshPromise: Promise<TokenPair | null> | null = null
 
 async function doRefresh(): Promise<TokenPair | null> {
   const refreshToken = authStorage.getRefreshToken()
-  if (!refreshToken) return null
+  if (!refreshToken) {
+    // Drop orphan middleware cookie so /login is not bounced by stale RBAC.
+    await authStorage.clear()
+    return null
+  }
   if (authStorage.isRefreshExpired()) {
     await authStorage.clear()
     return null

@@ -6,11 +6,18 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { Eye, RefreshCw, Sparkles } from "lucide-react"
 
 import { AdminTableShell } from "@/components/admin/admin-table-shell"
-import { StatusBadge } from "@/components/admin/status-badge"
 import { FadeIn, PageTransition } from "@/components/motion/page-transition"
 import { PageHeader } from "@/components/shared/page-header"
+import { Badge } from "@/components/ui/badge"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import {
   Table,
   TableBody,
@@ -26,9 +33,77 @@ import { jobsApi } from "@/services/jobs"
 import { resumesApi } from "@/services/resumes"
 import { ApiError } from "@/types/api"
 import type { ApplicationMatch } from "@/types/application"
-import { APPLICATION_STATUS_LABELS } from "@/types/application"
 import type { Job } from "@/types/job"
 import type { Resume } from "@/types/resume"
+
+function formatJobLabel(job: Pick<Job, "title" | "company_name">) {
+  const company = (job.company_name || "").trim()
+  const title = (job.title || "").trim() || "Untitled role"
+  return company ? `${company} - ${title}` : title
+}
+
+function formatJobLabelFromMatch(row: ApplicationMatch) {
+  return formatJobLabel({
+    title: row.job_title || "Untitled role",
+    company_name: row.company_name,
+  })
+}
+
+function candidateName(resume: Resume) {
+  const name = (resume.candidate_name || "").trim()
+  if (name && name.toLowerCase() !== "unknown candidate") return name
+  if (resume.candidate_email) return resume.candidate_email
+  return "Unknown candidate"
+}
+
+function chipList(items: string[] | null | undefined, empty = "—", limit = 3) {
+  const list = (items ?? []).filter(Boolean)
+  if (!list.length) {
+    return <span className="text-sm text-muted-foreground">{empty}</span>
+  }
+  return (
+    <div className="flex flex-wrap gap-1">
+      {list.slice(0, limit).map((item) => (
+        <Badge
+          key={item}
+          variant="outline"
+          className="max-w-40 truncate font-normal"
+          title={item}
+        >
+          {item}
+        </Badge>
+      ))}
+      {list.length > limit ? (
+        <span className="text-xs text-muted-foreground">+{list.length - limit}</span>
+      ) : null}
+    </div>
+  )
+}
+
+function formatScore(score: number | null | undefined) {
+  if (score == null || Number.isNaN(Number(score))) return "—"
+  return `${Math.round(Number(score))}%`
+}
+
+/** One selectable resume per candidate — prefer latest/primary. */
+function uniqueCandidateResumes(resumes: Resume[]) {
+  const ordered = [...resumes].sort((a, b) => {
+    if (a.is_primary !== b.is_primary) return a.is_primary ? -1 : 1
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  })
+  const seen = new Set<string>()
+  const unique: Resume[] = []
+  for (const resume of ordered) {
+    if (seen.has(resume.candidate_id)) continue
+    seen.add(resume.candidate_id)
+    unique.push(resume)
+  }
+  return unique.sort((a, b) =>
+    candidateName(a).localeCompare(candidateName(b), undefined, {
+      sensitivity: "base",
+    })
+  )
+}
 
 export default function ScreeningPageClient() {
   const searchParams = useSearchParams()
@@ -43,31 +118,106 @@ export default function ScreeningPageClient() {
   const [comparing, setComparing] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const candidateResumes = useMemo(
+    () => uniqueCandidateResumes(resumes),
+    [resumes]
+  )
+
+  const selectedJob = useMemo(
+    () => jobs.find((j) => j.id === jobId) ?? null,
+    [jobs, jobId]
+  )
   const selectedResume = useMemo(
     () => resumes.find((r) => r.id === resumeId) ?? null,
     [resumes, resumeId]
+  )
+
+  const jobSelectItems = useMemo(
+    () => [
+      { value: "__none__", label: "Select job" },
+      ...jobs.map((job) => ({
+        value: job.id,
+        label: formatJobLabel(job),
+      })),
+    ],
+    [jobs]
+  )
+
+  const resumeSelectItems = useMemo(
+    () => [
+      { value: "__none__", label: "Select candidate" },
+      ...candidateResumes.map((resume) => ({
+        value: resume.id,
+        label: candidateName(resume),
+      })),
+    ],
+    [candidateResumes]
+  )
+
+  const screenedHistory = useMemo(
+    () =>
+      [...history]
+        .filter(
+          (row) =>
+            row.match_score != null ||
+            row.ats_score != null ||
+            Boolean(row.summary) ||
+            (row.missing_skills?.length ?? 0) > 0 ||
+            (row.strengths?.length ?? 0) > 0
+        )
+        .sort(
+          (a, b) =>
+            new Date(b.updated_at || b.created_at).getTime() -
+            new Date(a.updated_at || a.created_at).getTime()
+        ),
+    [history]
   )
 
   const load = useCallback(async () => {
     setError(null)
     try {
       const [jobData, resumeData, appData] = await Promise.all([
-        jobsApi.list({ page: 1, page_size: 100, sort_by: "created_at", sort_order: "desc" }),
+        jobsApi.list({
+          page: 1,
+          page_size: 100,
+          sort_by: "created_at",
+          sort_order: "desc",
+        }),
         resumesApi.list({ page: 1, page_size: 100 }),
         applicationsApi.list({
           page: 1,
-          page_size: 20,
-          sort_by: "match_score",
+          page_size: 50,
+          sort_by: "created_at",
           sort_order: "desc",
         }),
       ])
-      setJobs(jobData.items)
+      const orderedJobs = [...jobData.items].sort((a, b) =>
+        formatJobLabel(a).localeCompare(formatJobLabel(b), undefined, {
+          sensitivity: "base",
+        })
+      )
+      setJobs(orderedJobs)
       setResumes(resumeData.items)
       setHistory(appData.items)
-      setJobId((prev) => prev || preselectedJobId || jobData.items[0]?.id || "")
-      setResumeId((prev) => prev || resumeData.items[0]?.id || "")
+
+      const unique = uniqueCandidateResumes(resumeData.items)
+      setJobId((prev) => prev || preselectedJobId || orderedJobs[0]?.id || "")
+      setResumeId((prev) => {
+        if (prev && unique.some((r) => r.id === prev)) return prev
+        if (prev) {
+          const sameCandidate = unique.find(
+            (r) =>
+              resumeData.items.find((x) => x.id === prev)?.candidate_id ===
+              r.candidate_id
+          )
+          if (sameCandidate) return sameCandidate.id
+        }
+        return unique[0]?.id || ""
+      })
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to load screening data")
+      setError(
+        err instanceof ApiError ? err.message : "Failed to load screening data"
+      )
     }
   }, [preselectedJobId])
 
@@ -77,7 +227,7 @@ export default function ScreeningPageClient() {
 
   async function handleCompare() {
     if (!jobId || !resumeId) {
-      setError("Select both a job and a resume")
+      setError("Select both a job and a candidate resume")
       return
     }
     setComparing(true)
@@ -90,8 +240,8 @@ export default function ScreeningPageClient() {
       setResult(match)
       const appData = await applicationsApi.list({
         page: 1,
-        page_size: 20,
-        sort_by: "match_score",
+        page_size: 50,
+        sort_by: "created_at",
         sort_order: "desc",
       })
       setHistory(appData.items)
@@ -106,8 +256,8 @@ export default function ScreeningPageClient() {
     <PageTransition>
       <FadeIn>
         <PageHeader
-          title="AI Screening"
-          description="Compare a parsed resume with a job description. Score, skills, summary, and reasoning are stored."
+          title="AI Resume Screening"
+          description="Compare a candidate resume with a job. ATS score, missing skills, strengths, and suggestions are saved in screening history."
           actions={
             <Button variant="outline" onClick={() => void load()}>
               <RefreshCw data-icon="inline-start" />
@@ -127,57 +277,115 @@ export default function ScreeningPageClient() {
         <div className="rounded-2xl border border-border/70 bg-card/80 p-5 shadow-none md:p-6">
           <div className="mb-5 flex items-center gap-2">
             <Sparkles className="size-4 text-primary" />
-            <h2 className="font-heading text-base font-semibold">Run comparison</h2>
+            <h2 className="font-heading text-base font-semibold">
+              Run screening
+            </h2>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
             <div className="grid gap-2">
-              <Label htmlFor="job">Job description</Label>
-              <select
-                id="job"
-                className="h-9 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-                value={jobId}
-                onChange={(e) => setJobId(e.target.value)}
+              <Label htmlFor="job">Job</Label>
+              <Select
+                value={jobId || "__none__"}
+                onValueChange={(value) =>
+                  setJobId(!value || value === "__none__" ? "" : value)
+                }
+                items={jobSelectItems}
               >
-                <option value="">Select job</option>
-                {jobs.map((job) => (
-                  <option key={job.id} value={job.id}>
-                    {job.title}
-                    {job.company_name ? ` · ${job.company_name}` : ""}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger id="job" className="w-full">
+                  <SelectValue placeholder="Select job">
+                    {(value) => {
+                      if (!value || value === "__none__") return null
+                      const job = jobs.find((j) => j.id === value)
+                      return job ? formatJobLabel(job) : null
+                    }}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__" label="Select job">
+                    Select job
+                  </SelectItem>
+                  {jobs.map((job) => {
+                    const label = formatJobLabel(job)
+                    return (
+                      <SelectItem key={job.id} value={job.id} label={label}>
+                        {label}
+                      </SelectItem>
+                    )
+                  })}
+                </SelectContent>
+              </Select>
+              {selectedJob ? (
+                <p className="text-xs text-muted-foreground">
+                  Selected:{" "}
+                  <span className="font-medium">
+                    {formatJobLabel(selectedJob)}
+                  </span>
+                </p>
+              ) : null}
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="resume">Resume</Label>
-              <select
-                id="resume"
-                className="h-9 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-                value={resumeId}
-                onChange={(e) => setResumeId(e.target.value)}
+              <Label htmlFor="resume">Candidate</Label>
+              <Select
+                value={resumeId || "__none__"}
+                onValueChange={(value) =>
+                  setResumeId(!value || value === "__none__" ? "" : value)
+                }
+                items={resumeSelectItems}
               >
-                <option value="">Select resume</option>
-                {resumes.map((resume) => (
-                  <option key={resume.id} value={resume.id}>
-                    {resume.candidate_name || "Candidate"} · {resume.file_name} (
-                    {resume.status})
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger id="resume" className="w-full">
+                  <SelectValue placeholder="Select candidate">
+                    {(value) => {
+                      if (!value || value === "__none__") return null
+                      const resume =
+                        candidateResumes.find((r) => r.id === value) ||
+                        resumes.find((r) => r.id === value)
+                      return resume ? candidateName(resume) : null
+                    }}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__" label="Select candidate">
+                    Select candidate
+                  </SelectItem>
+                  {candidateResumes.map((resume) => {
+                    const label = candidateName(resume)
+                    return (
+                      <SelectItem key={resume.id} value={resume.id} label={label}>
+                        {label}
+                      </SelectItem>
+                    )
+                  })}
+                </SelectContent>
+              </Select>
+              {selectedResume ? (
+                <p className="text-xs text-muted-foreground">
+                  Screening{" "}
+                  <span className="font-medium">
+                    {candidateName(selectedResume)}
+                  </span>
+                  {selectedResume.candidate_email
+                    ? ` · ${selectedResume.candidate_email}`
+                    : ""}
+                </p>
+              ) : null}
               {selectedResume && selectedResume.status !== "parsed" ? (
                 <p className="text-xs text-amber-700 dark:text-amber-300">
-                  This resume is not fully parsed yet — matching works best when status is
-                  “parsed”.
+                  Resume status is “{selectedResume.status}”. Compare will try to
+                  re-parse when possible.
                 </p>
               ) : null}
             </div>
           </div>
 
           <div className="mt-5">
-            <Button onClick={() => void handleCompare()} disabled={comparing || loading}>
+            <Button
+              onClick={() => void handleCompare()}
+              disabled={comparing || !jobId || !resumeId}
+            >
               <Sparkles data-icon="inline-start" />
-              {comparing ? "Comparing with OpenAI…" : "Compare resume & job"}
+              {comparing ? "Screening…" : "Run AI screening"}
             </Button>
           </div>
         </div>
@@ -191,52 +399,75 @@ export default function ScreeningPageClient() {
 
       <FadeIn>
         <AdminTableShell
-          title="Stored match results"
-          description="Previous OpenAI comparisons saved on applications."
+          title="Screening history"
+          description="Saved ATS scores, missing skills, suggestions, and candidate strengths"
         >
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Candidate</TableHead>
-                <TableHead className="hidden md:table-cell">Job</TableHead>
-                <TableHead>Score</TableHead>
-                <TableHead className="hidden sm:table-cell">Status</TableHead>
+                <TableHead className="hidden lg:table-cell">Job</TableHead>
+                <TableHead>ATS Score</TableHead>
+                <TableHead className="hidden md:table-cell">
+                  Missing Skills
+                </TableHead>
+                <TableHead className="hidden xl:table-cell">
+                  Suggestions
+                </TableHead>
+                <TableHead className="hidden xl:table-cell">
+                  Candidate Strengths
+                </TableHead>
                 <TableHead className="text-right">View</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {history.length === 0 ? (
+              {screenedHistory.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
-                    {loading ? "Loading…" : "No matches stored yet — run a comparison above"}
+                  <TableCell
+                    colSpan={7}
+                    className="h-24 text-center text-muted-foreground"
+                  >
+                    {loading
+                      ? "Loading…"
+                      : "No screening history yet — run a comparison above"}
                   </TableCell>
                 </TableRow>
               ) : (
-                history.map((row) => (
+                screenedHistory.map((row) => (
                   <TableRow key={row.id} className="hover:bg-muted/40">
                     <TableCell>
-                      <div className="font-medium">{row.candidate_name || "—"}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {row.candidate_email || row.resume_file_name || "—"}
+                      <div className="font-medium">
+                        {row.candidate_name || "—"}
+                      </div>
+                      <div className="text-xs text-muted-foreground lg:hidden">
+                        {formatJobLabelFromMatch(row)}
                       </div>
                     </TableCell>
-                    <TableCell className="hidden md:table-cell">
-                      <div>{row.job_title || "—"}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {row.company_name || ""}
+                    <TableCell className="hidden max-w-56 lg:table-cell">
+                      <div className="truncate font-medium" title={formatJobLabelFromMatch(row)}>
+                        {formatJobLabelFromMatch(row)}
                       </div>
                     </TableCell>
                     <TableCell className="font-semibold tabular-nums">
-                      {row.match_score != null ? `${Math.round(row.match_score)}%` : "—"}
+                      {formatScore(row.ats_score ?? row.match_score)}
                     </TableCell>
-                    <TableCell className="hidden sm:table-cell">
-                      <StatusBadge status={APPLICATION_STATUS_LABELS[row.status]} />
+                    <TableCell className="hidden max-w-52 md:table-cell">
+                      {chipList(row.missing_skills, "None")}
+                    </TableCell>
+                    <TableCell className="hidden max-w-56 xl:table-cell">
+                      {chipList(row.suggestions, "None", 2)}
+                    </TableCell>
+                    <TableCell className="hidden max-w-56 xl:table-cell">
+                      {chipList(row.strengths, "None", 2)}
                     </TableCell>
                     <TableCell className="text-right">
                       <Link
                         href={`/screening/${row.id}`}
-                        className={buttonVariants({ variant: "ghost", size: "icon-sm" })}
-                        aria-label="View match"
+                        className={buttonVariants({
+                          variant: "ghost",
+                          size: "icon-sm",
+                        })}
+                        aria-label={`View screening for ${row.candidate_name || "candidate"}`}
                       >
                         <Eye />
                       </Link>

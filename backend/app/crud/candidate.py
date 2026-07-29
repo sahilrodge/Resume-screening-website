@@ -57,6 +57,7 @@ class CRUDCandidate:
             user_id=user.id,
             phone=obj_in.phone,
             location=obj_in.location,
+            date_of_birth=obj_in.date_of_birth,
             headline=obj_in.headline,
             summary=obj_in.summary,
             years_experience=obj_in.years_experience,
@@ -64,6 +65,9 @@ class CRUDCandidate:
             github_url=getattr(obj_in, "github_url", None),
             portfolio_url=obj_in.portfolio_url,
             current_title=obj_in.current_title,
+            preferred_job_role=obj_in.preferred_job_role,
+            preferred_location=obj_in.preferred_location,
+            expected_salary=obj_in.expected_salary,
         )
         db.add(candidate)
         db.commit()

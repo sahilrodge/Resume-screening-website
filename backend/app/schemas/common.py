@@ -18,6 +18,9 @@ class HealthResponse(BaseModel):
     app: str
     version: str
     environment: str
+    storage_backend: str | None = None
+    cloudinary_configured: bool | None = None
+    storage_message: str | None = None
 
 
 class ReadyResponse(BaseModel):
@@ -28,6 +31,8 @@ class ReadyResponse(BaseModel):
     version: str
     environment: str
     database: str
+    storage_backend: str | None = None
+    cloudinary_configured: bool | None = None
 
 
 class ErrorDetail(BaseModel):
