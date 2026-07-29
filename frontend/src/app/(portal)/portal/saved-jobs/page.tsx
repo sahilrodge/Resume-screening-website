@@ -1,13 +1,13 @@
 "use client"
 
-import { Suspense, useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import Link from "next/link"
-import { useSearchParams } from "next/navigation"
-import { Bookmark, BookmarkCheck } from "lucide-react"
+import { BookmarkX, Search } from "lucide-react"
 
 import { applicationsApi } from "@/services/applications"
 import { jobsApi } from "@/services/jobs"
-import type { Job } from "@/types/job"
+import type { EmploymentType, Job } from "@/types/job"
+import { EMPLOYMENT_TYPE_LABELS } from "@/types/job"
 import { ApiError } from "@/types/api"
 import { Button, buttonVariants } from "@/components/ui/button"
 import {
@@ -18,6 +18,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { PageSkeleton } from "@/components/shared/page-skeleton"
 import { useCandidateSync } from "@/features/candidate/candidate-sync-provider"
 import {
@@ -30,50 +38,27 @@ import {
 import { CompanyLink } from "@/features/companies/company-link"
 import { HirePulseMark } from "@/components/brand/hirepulse-mark"
 
-function PortalJobsContent() {
-  const searchParams = useSearchParams()
-  const query = (searchParams.get("q") ?? "").trim().toLowerCase()
+type TypeFilter = "all" | EmploymentType
+type AppliedFilter = "all" | "saved_only" | "applied"
+
+export default function SavedJobsPage() {
   const {
+    savedJobs,
     applications,
     hasResume,
-    savedJobIds,
+    loading,
+    error: syncError,
     markJobSaved,
     refresh,
-    error: syncError,
   } = useCandidateSync()
 
-  const [jobs, setJobs] = useState<Job[]>([])
-  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState("")
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>("all")
+  const [appliedFilter, setAppliedFilter] = useState<AppliedFilter>("all")
   const [error, setError] = useState<string | null>(null)
   const [applyingId, setApplyingId] = useState<string | null>(null)
-  const [savingId, setSavingId] = useState<string | null>(null)
+  const [removingId, setRemovingId] = useState<string | null>(null)
   const [confirmJob, setConfirmJob] = useState<Job | null>(null)
-
-  useEffect(() => {
-    let cancelled = false
-    setLoading(true)
-    jobsApi
-      .listOpen({
-        page: 1,
-        page_size: 100,
-        search: query || undefined,
-      })
-      .then((openJobs) => {
-        if (!cancelled) {
-          setJobs(openJobs.items)
-          setError(null)
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setError("Failed to load jobs.")
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [query])
 
   const appliedJobIds = useMemo(
     () => new Set(applications.map((a) => a.job_id)),
@@ -81,16 +66,24 @@ function PortalJobsContent() {
   )
 
   const filteredJobs = useMemo(() => {
-    if (!query) return jobs
-    return jobs.filter(
-      (job) =>
-        job.title.toLowerCase().includes(query) ||
-        (job.company_name ?? "").toLowerCase().includes(query) ||
-        (job.location ?? "").toLowerCase().includes(query) ||
-        (job.description ?? "").toLowerCase().includes(query) ||
-        (job.skills ?? []).some((skill) => skill.toLowerCase().includes(query))
-    )
-  }, [jobs, query])
+    const q = search.trim().toLowerCase()
+    return savedJobs.filter((job) => {
+      if (typeFilter !== "all" && job.employment_type !== typeFilter) {
+        return false
+      }
+      const applied = appliedJobIds.has(job.id)
+      if (appliedFilter === "applied" && !applied) return false
+      if (appliedFilter === "saved_only" && applied) return false
+      if (!q) return true
+      return (
+        job.title.toLowerCase().includes(q) ||
+        (job.company_name ?? "").toLowerCase().includes(q) ||
+        (job.location ?? "").toLowerCase().includes(q) ||
+        (job.description ?? "").toLowerCase().includes(q) ||
+        (job.skills ?? []).some((skill) => skill.toLowerCase().includes(q))
+      )
+    })
+  }, [savedJobs, search, typeFilter, appliedFilter, appliedJobIds])
 
   async function apply(job: Job) {
     if (!hasResume) {
@@ -114,22 +107,18 @@ function PortalJobsContent() {
     }
   }
 
-  async function toggleSave(job: Job) {
-    setSavingId(job.id)
+  async function removeSaved(job: Job) {
+    setRemovingId(job.id)
     setError(null)
-    const wasSaved = savedJobIds.has(job.id)
     try {
-      if (wasSaved) {
-        await jobsApi.unsave(job.id)
-        markJobSaved(job.id, false)
-      } else {
-        await jobsApi.save(job.id)
-        markJobSaved(job.id, true)
-      }
+      await jobsApi.unsave(job.id)
+      markJobSaved(job.id, false)
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not update saved job.")
+      setError(
+        err instanceof ApiError ? err.message : "Could not remove saved job."
+      )
     } finally {
-      setSavingId(null)
+      setRemovingId(null)
     }
   }
 
@@ -138,20 +127,73 @@ function PortalJobsContent() {
   return (
     <div className="mx-auto max-w-3xl space-y-8">
       <header className="space-y-1">
-        <h1 className="font-heading text-2xl font-semibold tracking-tight">Jobs</h1>
+        <h1 className="font-heading text-2xl font-semibold tracking-tight">
+          Saved Jobs
+        </h1>
         <p className="text-sm text-muted-foreground">
-          Browse open roles, save jobs, and track your applications.
+          Roles you bookmarked — remove, search, filter, or apply when ready.
         </p>
       </header>
 
       {!loading && !hasResume ? (
         <p className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm">
           Upload a resume before you can apply.{" "}
-          <Link href="/portal/profile" className="font-medium text-primary underline">
+          <Link
+            href="/portal/profile"
+            className="font-medium text-primary underline"
+          >
             Go to profile
           </Link>
         </p>
       ) : null}
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="relative min-w-0 flex-1 sm:max-w-xs">
+          <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search saved jobs…"
+            className="h-9 bg-muted/40 pl-8"
+            aria-label="Search saved jobs"
+          />
+        </div>
+        <Select
+          value={typeFilter}
+          onValueChange={(value) =>
+            setTypeFilter((value ?? "all") as TypeFilter)
+          }
+        >
+          <SelectTrigger className="w-full sm:w-[10.5rem]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All types</SelectItem>
+            {(
+              Object.keys(EMPLOYMENT_TYPE_LABELS) as EmploymentType[]
+            ).map((type) => (
+              <SelectItem key={type} value={type}>
+                {EMPLOYMENT_TYPE_LABELS[type]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select
+          value={appliedFilter}
+          onValueChange={(value) =>
+            setAppliedFilter((value ?? "all") as AppliedFilter)
+          }
+        >
+          <SelectTrigger className="w-full sm:w-[11rem]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All saved</SelectItem>
+            <SelectItem value="saved_only">Not applied</SelectItem>
+            <SelectItem value="applied">Already applied</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
 
       {loading ? <PageSkeleton withHeader={false} rows={4} /> : null}
       {displayError ? (
@@ -160,56 +202,39 @@ function PortalJobsContent() {
         </p>
       ) : null}
 
-      <section className="space-y-3">
-        <h2 className="text-sm font-medium">Your applications</h2>
-        {applications.length === 0 && !loading ? (
-          <p className="text-sm text-muted-foreground">No applications yet.</p>
-        ) : null}
-        <ul className="divide-y divide-border">
-          {applications.map((app) => (
-            <li
-              key={app.id}
-              className="flex flex-col gap-1 py-3 sm:flex-row sm:items-center sm:justify-between"
-            >
-              <div>
-                <p className="font-medium">{app.job_title ?? "Role"}</p>
-                <p className="text-sm text-muted-foreground">
-                  {app.company_name ?? "Company"}
-                  {app.match_score != null
-                    ? ` · Match ${Math.round(app.match_score)}%`
-                    : ""}
-                </p>
-              </div>
-              <span className="text-sm capitalize text-muted-foreground">
-                {(app.status ?? "unknown").replaceAll("_", " ")}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </section>
+      {!loading ? (
+        <p className="text-sm text-muted-foreground">
+          {filteredJobs.length} of {savedJobs.length} saved{" "}
+          {savedJobs.length === 1 ? "job" : "jobs"}
+          {search.trim() || typeFilter !== "all" || appliedFilter !== "all"
+            ? " matching filters"
+            : ""}
+        </p>
+      ) : null}
 
-      <section className="space-y-3 border-t border-border pt-6">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-sm font-medium">Open roles</h2>
-          {query ? (
-            <Link
-              href="/portal/jobs"
-              className={buttonVariants({ variant: "ghost", size: "sm" })}
-            >
-              Clear search “{query}”
-            </Link>
-          ) : null}
-        </div>
+      <section className="space-y-3">
         {filteredJobs.length === 0 && !loading ? (
-          <p className="text-sm text-muted-foreground">
-            {query ? "No jobs match your search." : "No open jobs right now."}
-          </p>
+          <div className="space-y-2 py-6 text-sm text-muted-foreground">
+            <p>
+              {savedJobs.length === 0
+                ? "No saved jobs yet. Browse open roles and tap Save."
+                : "No saved jobs match your search or filters."}
+            </p>
+            {savedJobs.length === 0 ? (
+              <Link
+                href="/portal/jobs"
+                className={buttonVariants({ variant: "outline", size: "sm" })}
+              >
+                Browse jobs
+              </Link>
+            ) : null}
+          </div>
         ) : null}
+
         <ul className="divide-y divide-border">
           {filteredJobs.map((job) => {
             const alreadyApplied = appliedJobIds.has(job.id)
             const deadlinePassed = isJobDeadlinePassed(job.closes_at)
-            const isSaved = savedJobIds.has(job.id)
             const applyDisabled =
               alreadyApplied ||
               applyingId === job.id ||
@@ -267,20 +292,19 @@ function PortalJobsContent() {
                       type="button"
                       size="sm"
                       variant="outline"
-                      disabled={savingId === job.id}
-                      onClick={() => void toggleSave(job)}
+                      disabled={removingId === job.id}
+                      onClick={() => void removeSaved(job)}
                       className="gap-1.5"
                     >
-                      {isSaved ? (
-                        <BookmarkCheck className="size-4" />
-                      ) : (
-                        <Bookmark className="size-4" />
-                      )}
-                      {isSaved ? "Saved" : "Save"}
+                      <BookmarkX className="size-4" />
+                      {removingId === job.id ? "Removing…" : "Remove"}
                     </Button>
                     <Link
                       href={`/portal/jobs/${job.id}`}
-                      className={buttonVariants({ size: "sm", variant: "outline" })}
+                      className={buttonVariants({
+                        size: "sm",
+                        variant: "outline",
+                      })}
                     >
                       Details
                     </Link>
@@ -317,8 +341,9 @@ function PortalJobsContent() {
           <DialogHeader>
             <DialogTitle>Application submitted</DialogTitle>
             <DialogDescription>
-              Your application for {confirmJob?.title ?? "this role"} was stored and
-              sent to the recruiter. You can track it under Your applications.
+              Your application for {confirmJob?.title ?? "this role"} was stored
+              and sent to the recruiter. You can track it under Jobs → Your
+              applications.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -329,13 +354,5 @@ function PortalJobsContent() {
         </DialogContent>
       </Dialog>
     </div>
-  )
-}
-
-export default function PortalJobsPage() {
-  return (
-    <Suspense fallback={<PageSkeleton withHeader={false} rows={4} />}>
-      <PortalJobsContent />
-    </Suspense>
   )
 }

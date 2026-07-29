@@ -27,6 +27,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useAuth } from "@/features/auth/auth-provider"
+import { useCandidateSyncOptional } from "@/features/candidate/candidate-sync-provider"
 import { urlBase64ToUint8Array } from "@/lib/push"
 import { authService } from "@/services/auth"
 import { notificationsApi } from "@/services/notifications"
@@ -55,6 +56,7 @@ export function SettingsPageClient({
   showPushControls = false,
 }: SettingsPageClientProps) {
   const { user, logout, refreshUser } = useAuth()
+  const candidateSync = useCandidateSyncOptional()
   const { theme, setTheme, resolvedTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
 
@@ -96,13 +98,21 @@ export function SettingsPageClient({
   useEffect(() => {
     let cancelled = false
     setLoading(true)
+
+    const profilePromise =
+      candidateSync != null
+        ? candidateSync.profile
+          ? Promise.resolve(candidateSync.profile)
+          : candidateSync.refresh().then((data) => data?.profile ?? profileApi.me())
+        : profileApi.me()
+
     Promise.all([
-      profileApi.me(),
+      profilePromise,
       notificationsApi.getPreferences(),
       settingsApi.me(),
     ])
       .then(([me, notificationPrefs, settings]) => {
-        if (cancelled) return
+        if (cancelled || !me) return
         setProfile(me)
         setEmail(me.email)
         setPreferredJobRole(me.preferred_job_role ?? "")
@@ -132,7 +142,7 @@ export function SettingsPageClient({
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [candidateSync?.profile?.updated_at])
 
   function flash(message: string) {
     setSaved(message)

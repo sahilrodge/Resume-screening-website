@@ -7,13 +7,14 @@ from typing import Annotated
 
 from fastapi import APIRouter, Query, status
 
-from app.api.deps import DBSession, RecruiterUser
+from app.api.deps import CandidateUser, DBSession, RecruiterUser
 from app.schemas.interview import (
     InterviewCreate,
     InterviewListResponse,
     InterviewResponse,
     InterviewStatusUpdate,
 )
+from app.services.candidate import candidate_service
 from app.services.interview import interview_service
 
 router = APIRouter(prefix="/interviews", tags=["interviews"])
@@ -50,6 +51,23 @@ def list_interviews(
         page=page,
         page_size=page_size,
         application_id=application_id,
+    )
+
+
+@router.get(
+    "/me",
+    response_model=InterviewListResponse,
+    summary="List interviews for the authenticated candidate",
+)
+def list_my_interviews(
+    db: DBSession,
+    current_user: CandidateUser,
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=100)] = 20,
+) -> InterviewListResponse:
+    me = candidate_service.get_by_user_id(db, current_user.id)
+    return interview_service.list_for_candidate(
+        db, candidate_id=me.id, page=page, page_size=page_size
     )
 
 

@@ -17,8 +17,10 @@ from app.schemas.candidate import (
     CandidateUpdate,
     SortOrder,
 )
+from app.schemas.candidate_overview import CandidateOverviewResponse
 from app.schemas.common import MessageResponse
 from app.services.candidate import candidate_service
+from app.services.candidate_overview import candidate_overview_service
 
 router = APIRouter(prefix="/candidates", tags=["candidates"])
 
@@ -91,6 +93,18 @@ def get_my_candidate_profile(
     current_user: CandidateUser,
 ) -> CandidateProfileResponse:
     return candidate_service.get_profile_by_user_id(db, current_user.id)
+
+
+@router.get(
+    "/me/overview",
+    response_model=CandidateOverviewResponse,
+    summary="Synced candidate overview (profile, resume, jobs, screening, interviews, notifications)",
+)
+def get_my_candidate_overview(
+    db: DBSession,
+    current_user: CandidateUser,
+) -> CandidateOverviewResponse:
+    return candidate_overview_service.get_overview(db, user=current_user)
 
 
 @router.patch(

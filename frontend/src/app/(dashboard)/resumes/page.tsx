@@ -207,13 +207,7 @@ export default function ResumesPage() {
       )
       setFile(null)
       setSuccess(
-        resume.status === "parsed"
-          ? `Uploaded “${resume.file_name}” for ${candidateLabel(resume, candidatesById)}.`
-          : resume.status === "failed"
-            ? `Uploaded “${resume.file_name}”, but parsing failed${
-                resume.parse_error ? `: ${resume.parse_error}` : "."
-              }`
-            : `Uploaded “${resume.file_name}”.`
+        `Uploaded “${resume.file_name}” for ${candidateLabel(resume, candidatesById)}. Profile fields were not changed. Parsing runs only during AI Screening.`
       )
       await load()
     } catch (err) {
@@ -246,19 +240,32 @@ export default function ResumesPage() {
       setPreviewUrl(null)
     }
     try {
+      const lower = resume.file_name.toLowerCase()
       const isPdf =
-        resume.file_type === "application/pdf" ||
-        resume.file_name.toLowerCase().endsWith(".pdf")
-      if (!isPdf) {
+        resume.file_type === "application/pdf" || lower.endsWith(".pdf")
+      const isText =
+        lower.endsWith(".txt") ||
+        lower.endsWith(".rtf") ||
+        (resume.file_type || "").includes("text/plain") ||
+        (resume.file_type || "").includes("rtf")
+
+      if (!isPdf && !isText) {
         setPreviewLoading(false)
         return
       }
-      if (/^https?:\/\//i.test(resume.file_url)) {
+      if (/^https?:\/\//i.test(resume.file_url) && isPdf) {
         setPreviewUrl(resume.file_url)
         setPreviewLoading(false)
         return
       }
       const blob = await resumesApi.fetchBlob(resume.id)
+      if (isText) {
+        const text = await blob.text()
+        const textBlob = new Blob([text], { type: "text/plain" })
+        const url = URL.createObjectURL(textBlob)
+        setPreviewUrl(url)
+        return
+      }
       const url = URL.createObjectURL(blob)
       setPreviewUrl(url)
     } catch (err) {
@@ -290,7 +297,7 @@ export default function ResumesPage() {
       <FadeIn>
         <PageHeader
           title="Resumes"
-          description="Manage candidate resumes with ATS scores and applied jobs. Search by candidate name or file."
+          description="Upload and manage candidate resume files (PDF, DOC, DOCX, TXT, RTF). Upload stores the file only — profile data is never overwritten. AI parsing runs during Resume Screening."
           actions={
             <Button variant="outline" onClick={() => void load()}>
               <RefreshCw data-icon="inline-start" />
@@ -390,8 +397,9 @@ export default function ResumesPage() {
 
           <div className="flex flex-wrap items-center gap-4 md:col-span-2">
             <p className="text-xs text-muted-foreground">
-              Uploads are set as <span className="font-medium">Latest</span> and
-              replace older resumes for this candidate.
+              Upload stores the file as <span className="font-medium">Latest</span>{" "}
+              and replaces older resumes. Profile fields stay unchanged. Parsing
+              happens only when you run AI Screening.
             </p>
             <Button type="submit" disabled={uploading || !file} className="ml-auto">
               <Upload data-icon="inline-start" />
@@ -590,8 +598,8 @@ export default function ResumesPage() {
                   <FileText className="mx-auto mb-3 size-8 text-muted-foreground" />
                   <p className="font-medium">{preview.file_name}</p>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Inline preview is available for PDF files. Use Download to
-                    open this resume.
+                    Inline preview is available for PDF, TXT, and RTF. Use
+                    Download to open DOC/DOCX files.
                   </p>
                 </div>
               )}

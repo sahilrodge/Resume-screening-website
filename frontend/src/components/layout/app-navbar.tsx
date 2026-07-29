@@ -9,10 +9,11 @@ import {
   useState,
   useTransition,
 } from "react"
-import { Bell, Briefcase, CheckCheck, FileText, Loader2, LogOut, Search, Settings, Trash2, UserRound } from "lucide-react"
+import { Bell, Bookmark, Briefcase, CheckCheck, FileText, Loader2, LogOut, Search, Settings, Trash2, UserRound } from "lucide-react"
 
 import { getNavMeta } from "@/config/navigation"
 import { useAuth } from "@/features/auth/auth-provider"
+import { useCandidateSyncOptional } from "@/features/candidate/candidate-sync-provider"
 import { ThemeToggle } from "@/components/layout/theme-toggle"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -67,6 +68,7 @@ export function AppNavbar() {
   const pathname = usePathname()
   const router = useRouter()
   const { user, logout } = useAuth()
+  const candidateSync = useCandidateSyncOptional()
   const meta = getNavMeta(pathname, user?.role)
   const searchListId = useId()
 
@@ -92,6 +94,7 @@ export function AppNavbar() {
   const settingsHref = isCandidate ? "/portal/settings" : "/settings"
   const profileHref = isCandidate ? "/portal/profile" : "/profile"
   const resumeHref = isCandidate ? "/portal/screening" : "/resumes"
+  const savedJobsHref = "/portal/saved-jobs"
   const notificationsHref = isCandidate
     ? "/portal/notifications"
     : "/notifications"
@@ -99,7 +102,16 @@ export function AppNavbar() {
   const [loggingOut, setLoggingOut] = useState(false)
   const [accountOpen, setAccountOpen] = useState(false)
 
+  const syncedUnread = candidateSync?.unreadCount
+  const syncedSavedCount = candidateSync?.savedJobsTotal
+  const displayUnread = syncedUnread ?? unread
+  const savedJobsCount = syncedSavedCount ?? 0
+
   const refreshUnread = useCallback(() => {
+    if (candidateSync) {
+      // Unread count comes from CandidateSyncProvider overview
+      return
+    }
     if (!user) {
       setUnread(0)
       return
@@ -108,14 +120,14 @@ export function AppNavbar() {
       .unreadCount()
       .then((res) => setUnread(res.unread_count))
       .catch(() => setUnread(0))
-  }, [user])
+  }, [user, candidateSync])
 
   useEffect(() => {
     refreshUnread()
-    if (!user) return
+    if (!user || candidateSync) return
     const id = window.setInterval(refreshUnread, 30000)
     return () => window.clearInterval(id)
-  }, [user, pathname, refreshUnread])
+  }, [user, pathname, refreshUnread, candidateSync])
 
   useEffect(() => {
     function onPointerDown(event: MouseEvent) {
@@ -228,6 +240,13 @@ export function AppNavbar() {
 
   async function loadNotifications() {
     if (!user) return
+    if (candidateSync) {
+      setNotifications(candidateSync.notifications.slice(0, 12))
+      setNotifError(null)
+      setNotifLoading(false)
+      void candidateSync.refresh({ silent: true })
+      return
+    }
     setNotifLoading(true)
     setNotifError(null)
     try {
@@ -252,7 +271,16 @@ export function AppNavbar() {
       setNotifications((prev) =>
         prev.map((n) => (n.id === id ? { ...n, is_read: true } : n))
       )
-      refreshUnread()
+      if (candidateSync) {
+        candidateSync.setNotifications(
+          candidateSync.notifications.map((n) =>
+            n.id === id ? { ...n, is_read: true } : n
+          )
+        )
+        candidateSync.setUnreadCount(Math.max(0, candidateSync.unreadCount - 1))
+      } else {
+        refreshUnread()
+      }
     } catch {
       setNotifError("Could not mark as read.")
     }
@@ -263,6 +291,12 @@ export function AppNavbar() {
       const res = await notificationsApi.markAllRead()
       setUnread(res.unread_count)
       setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })))
+      if (candidateSync) {
+        candidateSync.setUnreadCount(res.unread_count)
+        candidateSync.setNotifications(
+          candidateSync.notifications.map((n) => ({ ...n, is_read: true }))
+        )
+      }
     } catch {
       setNotifError("Could not mark all as read.")
     }
@@ -273,6 +307,10 @@ export function AppNavbar() {
       const res = await notificationsApi.clearAll()
       setUnread(res.unread_count)
       setNotifications([])
+      if (candidateSync) {
+        candidateSync.setUnreadCount(0)
+        candidateSync.setNotifications([])
+      }
     } catch {
       setNotifError("Could not clear notifications.")
     }
@@ -421,9 +459,9 @@ export function AppNavbar() {
             aria-label="Notifications"
           >
             <Bell className="size-4" />
-            {unread > 0 ? (
+            {displayUnread > 0 ? (
               <Badge className="absolute -top-0.5 -right-0.5 h-4 min-w-4 px-1 text-[10px]">
-                {unread > 99 ? "99+" : unread}
+                {displayUnread > 99 ? "99+" : displayUnread}
               </Badge>
             ) : null}
           </DropdownMenuTrigger>
@@ -435,7 +473,7 @@ export function AppNavbar() {
               <div>
                 <p className="text-sm font-medium">Notifications</p>
                 <p className="text-xs text-muted-foreground">
-                  {unread > 0 ? `${unread} unread` : "You are all caught up"}
+                  {displayUnread > 0 ? `${displayUnread} unread` : "You are all caught up"}
                 </p>
               </div>
               <div className="flex items-center gap-1">
@@ -445,7 +483,7 @@ export function AppNavbar() {
                   size="icon-sm"
                   aria-label="Mark all as read"
                   title="Mark all as read"
-                  disabled={unread === 0}
+                  disabled={displayUnread === 0}
                   onClick={() => void onMarkAllRead()}
                 >
                   <CheckCheck className="size-3.5" />
@@ -611,6 +649,24 @@ export function AppNavbar() {
               <FileText className="size-4 text-muted-foreground" />
               Resume
             </DropdownMenuItem>
+            {isCandidate ? (
+              <DropdownMenuItem
+                className="cursor-pointer gap-2.5 py-2"
+                onClick={() => {
+                  setAccountOpen(false)
+                  router.push(savedJobsHref)
+                }}
+              >
+                <Bookmark className="size-4 text-muted-foreground" />
+                <span className="flex-1">Saved Jobs</span>
+                <Badge
+                  variant="secondary"
+                  className="h-5 min-w-5 justify-center px-1.5 text-[11px] tabular-nums"
+                >
+                  {savedJobsCount}
+                </Badge>
+              </DropdownMenuItem>
+            ) : null}
             <DropdownMenuItem
               className="cursor-pointer gap-2.5 py-2"
               onClick={() => {

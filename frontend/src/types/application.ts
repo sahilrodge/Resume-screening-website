@@ -28,6 +28,8 @@ export type ApplicationMatch = {
   suggestions: string[]
   summary: string | null
   reasoning: string | null
+  scoring_engine?: "openai" | "local" | null
+  confidence?: number | null
   created_at: string
   updated_at: string
 }

@@ -105,14 +105,31 @@ class InterviewService:
         page: int = 1,
         page_size: int = 20,
         application_id: uuid.UUID | None = None,
+        candidate_id: uuid.UUID | None = None,
     ) -> InterviewListResponse:
         items, total = interview_crud.list(
             db,
             skip=(page - 1) * page_size,
             limit=page_size,
             application_id=application_id,
+            candidate_id=candidate_id,
         )
         return InterviewListResponse(items=[_to_response(i) for i in items], total=total)
+
+    def list_for_candidate(
+        self,
+        db: Session,
+        *,
+        candidate_id: uuid.UUID,
+        page: int = 1,
+        page_size: int = 50,
+    ) -> InterviewListResponse:
+        return self.list(
+            db,
+            page=page,
+            page_size=page_size,
+            candidate_id=candidate_id,
+        )
 
     def get(self, db: Session, interview_id: uuid.UUID) -> InterviewResponse:
         obj = interview_crud.get(db, interview_id)

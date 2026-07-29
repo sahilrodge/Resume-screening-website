@@ -57,18 +57,18 @@ export default function AssistantPage() {
           title={isAdmin ? "Platform Insights Assistant" : "Recruitment Assistant"}
           description={
             isAdmin
-              ? "Ask about analytics, hiring funnel health, job performance, and platform insights. Chat history is saved."
-              : "Get hiring suggestions, compare candidates, generate job descriptions, and schedule interviews. Chat history is saved."
+              ? "Ask about HirePulse features, analytics, hiring funnel health, and platform insights. Conversation context is kept."
+              : "Ask how HirePulse works, get hiring suggestions, compare candidates, draft JDs, and schedule interviews. Conversation context is kept."
           }
           emptyHint={
             isAdmin
-              ? "Start a chat to explore KPIs, funnel bottlenecks, and operational recommendations."
-              : "Optionally pick a job and candidate, then ask for hiring plans, comparisons, or a job description draft."
+              ? "Try: “How does Resume Screening work?” or ask about KPIs, funnel bottlenecks, and admin pages."
+              : "Try: “How do I run Resume Screening?” or ask for hiring plans, comparisons, or a JD draft."
           }
           inputPlaceholder={
             isAdmin
-              ? "Ask about analytics, funnel health, or platform insights…"
-              : "Ask for hiring suggestions, candidate comparison, or a job description…"
+              ? "Ask about HirePulse features, analytics, or platform insights…"
+              : "Ask about HirePulse features, hiring, screening, or job descriptions…"
           }
           showContextControls
           jobOptions={jobOptions}

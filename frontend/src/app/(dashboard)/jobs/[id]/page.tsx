@@ -14,6 +14,7 @@ import {
 } from "lucide-react"
 
 import { StatusBadge } from "@/components/admin/status-badge"
+import { HirePulseMark } from "@/components/brand/hirepulse-mark"
 import { FadeIn, PageTransition } from "@/components/motion/page-transition"
 import { PageHeader } from "@/components/shared/page-header"
 import { Badge } from "@/components/ui/badge"
@@ -198,18 +199,7 @@ export default function JobDetailsPage() {
                 <Building2 className="mt-0.5 size-4 text-muted-foreground" />
                 <div className="flex items-center gap-3">
                   <Link href={`/companies/${job.company_id}`} className="shrink-0">
-                    {job.company_logo_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={job.company_logo_url}
-                        alt={job.company_name ?? "Company"}
-                        className="size-10 rounded-lg border border-border object-contain bg-background p-1"
-                      />
-                    ) : (
-                      <span className="inline-flex size-10 items-center justify-center rounded-lg border border-border bg-muted/40">
-                        <Building2 className="size-4 text-muted-foreground" />
-                      </span>
-                    )}
+                    <HirePulseMark size="md" />
                   </Link>
                   <div>
                     <p className="text-xs uppercase tracking-wide text-muted-foreground">

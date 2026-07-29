@@ -15,13 +15,11 @@ from app.core.exceptions import AppException, ForbiddenError, NotFoundError
 from app.core.logging import get_logger
 from app.crud.candidate import candidate as candidate_crud
 from app.crud.resume import resume as resume_crud
-from app.crud.skill import skill as skill_crud
 from app.models.application import Application
 from app.models.enums import ResumeStatus
 from app.models.job import Job
 from app.models.resume import Resume
 from app.models.user import User
-from app.schemas.parsed_resume import ParsedResumeData
 from app.schemas.resume import (
     AppliedJobSummary,
     ResumeListResponse,
@@ -142,54 +140,8 @@ def _to_response(
     )
 
 
-def _estimate_years(experience: list) -> int | None:
-    if not experience:
-        return None
-    return min(40, max(1, len(experience) * 2))
-
-
-def _apply_parsed_to_candidate(
-    db: Session,
-    *,
-    candidate_id: uuid.UUID,
-    parsed: ParsedResumeData,
-) -> None:
-    candidate = candidate_crud.get(db, candidate_id)
-    if candidate is None:
-        return
-
-    if parsed.name and parsed.name.strip():
-        candidate.user.full_name = parsed.name.strip()[:255]
-    if parsed.phone and parsed.phone.strip():
-        candidate.phone = parsed.phone.strip()[:30]
-
-    if parsed.experience:
-        latest = parsed.experience[0]
-        if latest.title:
-            candidate.current_title = latest.title[:255]
-            if latest.company:
-                candidate.headline = f"{latest.title} at {latest.company}"[:255]
-            else:
-                candidate.headline = latest.title[:255]
-        candidate.experience = [item.model_dump() for item in parsed.experience]
-
-    if parsed.education:
-        candidate.education = [item.model_dump() for item in parsed.education]
-
-    years = _estimate_years(parsed.experience)
-    if years is not None and candidate.years_experience is None:
-        candidate.years_experience = years
-
-    if parsed.skills:
-        skill_crud.sync_candidate_skills(
-            db,
-            candidate_id=candidate.id,
-            skill_names=parsed.skills,
-        )
-
-    db.add(candidate.user)
-    db.add(candidate)
-    db.commit()
+# Upload stores the file only. Parsing runs during AI Screening (ensure_ready)
+# and must never overwrite candidate profile fields.
 
 
 def _api_download_path(resume_id: uuid.UUID, *, mine: bool = False) -> str:
@@ -267,6 +219,12 @@ class ResumeService:
         is_primary: bool = False,
         replace_existing: bool = False,
     ) -> ResumeResponse:
+        """
+        Store a resume file only.
+
+        Does NOT extract/parse text and does NOT modify candidate profile fields.
+        Parsing runs later during AI Resume Screening via ``ensure_ready``.
+        """
         candidate = candidate_crud.get(db, candidate_id)
         if candidate is None:
             raise NotFoundError("Candidate not found")
@@ -310,79 +268,20 @@ class ResumeService:
         )
 
         # Local files use authenticated download routes as their URL.
-        if stored.get("backend") == "local" or not created.file_url or created.file_url == "pending":
+        if (
+            stored.get("backend") == "local"
+            or not created.file_url
+            or created.file_url == "pending"
+        ):
             created.file_url = _public_download_url(created.id)
             db.add(created)
             db.commit()
             db.refresh(created)
 
-        created = resume_crud.set_status(db, db_obj=created, status=ResumeStatus.PARSING)
-        parse_error: str | None = None
-        raw_text: str | None = None
-
-        try:
-            raw_text = extract_resume_text(
-                file_bytes=data,
-                filename=filename,
-                content_type=content_type,
-            )
-        except AppException as exc:
-            parse_error = exc.message
-            logger.warning("Resume text extraction failed: %s", parse_error)
-            created = resume_crud.save_parse_result(
-                db,
-                db_obj=created,
-                status=ResumeStatus.FAILED,
-                parsed_data=None,
-            )
-        except Exception as exc:  # noqa: BLE001
-            parse_error = str(exc)
-            logger.exception("Unexpected resume extraction error")
-            created = resume_crud.save_parse_result(
-                db,
-                db_obj=created,
-                status=ResumeStatus.FAILED,
-                parsed_data=None,
-            )
-
-        if raw_text:
-            try:
-                parsed, warning = parse_resume_text_with_fallback(raw_text)
-                created = resume_crud.save_parse_result(
-                    db,
-                    db_obj=created,
-                    status=ResumeStatus.PARSED,
-                    raw_text=raw_text,
-                    parsed_data=parsed.model_dump(),
-                )
-                _apply_parsed_to_candidate(db, candidate_id=candidate_id, parsed=parsed)
-                created = resume_crud.get(db, created.id)
-                if warning:
-                    parse_error = (
-                        f"Parsed with fallback ({warning}). "
-                        "Re-upload later for richer AI extraction."
-                    )
-            except AppException as exc:
-                parse_error = exc.message
-                logger.warning("Resume parse failed: %s", parse_error)
-                # Keep extracted text so matching/re-parse can still proceed.
-                created = resume_crud.save_parse_result(
-                    db,
-                    db_obj=created,
-                    status=ResumeStatus.FAILED,
-                    raw_text=raw_text,
-                    parsed_data=None,
-                )
-            except Exception as exc:  # noqa: BLE001
-                parse_error = str(exc)
-                logger.exception("Unexpected resume parse error")
-                created = resume_crud.save_parse_result(
-                    db,
-                    db_obj=created,
-                    status=ResumeStatus.FAILED,
-                    raw_text=raw_text,
-                    parsed_data=None,
-                )
+        # Upload is store-only — leave status as UPLOADED (set by CRUD create).
+        created = resume_crud.set_status(
+            db, db_obj=created, status=ResumeStatus.UPLOADED
+        )
 
         if replace_existing and previous:
             for old in previous:
@@ -392,7 +291,10 @@ class ResumeService:
                 resume_crud.delete(db, db_obj=old)
 
         assert created is not None
-        return _to_response(db, created, parse_error=parse_error)
+        # Re-load with candidate relationship for response labels
+        refreshed = resume_crud.get(db, created.id)
+        assert refreshed is not None
+        return _to_response(db, refreshed)
 
     def list(
         self,
@@ -451,9 +353,9 @@ class ResumeService:
 
     def ensure_ready(self, db: Session, *, resume_id: uuid.UUID) -> Resume:
         """
-        Ensure a resume has parsed_data (and raw_text when possible) before matching.
+        Ensure a resume has parsed_data before AI screening / matching.
 
-        Re-extracts/re-parses failed uploads when the stored file is available.
+        Extracts and parses on demand. Never modifies candidate profile fields.
         """
         resume = resume_crud.get(db, resume_id)
         if resume is None:
@@ -464,6 +366,7 @@ class ResumeService:
 
         raw_text = (resume.raw_text or "").strip() or None
         if not raw_text:
+            resume_crud.set_status(db, db_obj=resume, status=ResumeStatus.PARSING)
             file_bytes = self._load_resume_bytes(resume)
             if file_bytes:
                 try:
@@ -473,6 +376,12 @@ class ResumeService:
                         content_type=resume.file_type or "",
                     )
                 except AppException as exc:
+                    resume_crud.save_parse_result(
+                        db,
+                        db_obj=resume,
+                        status=ResumeStatus.FAILED,
+                        parsed_data=None,
+                    )
                     raise AppException(
                         "Resume text could not be extracted. Re-upload a text-based "
                         "PDF/DOCX/TXT resume, then try matching again.",
@@ -482,22 +391,45 @@ class ResumeService:
                     ) from exc
 
         if not raw_text:
+            resume_crud.save_parse_result(
+                db,
+                db_obj=resume,
+                status=ResumeStatus.FAILED,
+                parsed_data=None,
+            )
             raise AppException(
-                "Resume must be parsed before matching. Re-upload the resume and "
-                "wait until status is Parsed.",
+                "Resume must be parsed before matching. Re-upload the resume, then "
+                "run AI Screening again.",
                 status_code=400,
                 code="resume_not_ready",
             )
 
         if resume.parsed_data:
-            # Has structured data already (even if status lagged).
             if resume.status != ResumeStatus.PARSED:
                 return resume_crud.set_status(
                     db, db_obj=resume, status=ResumeStatus.PARSED
                 )
             return resume
 
-        parsed, _warning = parse_resume_text_with_fallback(raw_text)
+        resume_crud.set_status(db, db_obj=resume, status=ResumeStatus.PARSING)
+        try:
+            parsed, _warning = parse_resume_text_with_fallback(raw_text)
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("Resume parse failed during screening")
+            resume_crud.save_parse_result(
+                db,
+                db_obj=resume,
+                status=ResumeStatus.FAILED,
+                raw_text=raw_text,
+                parsed_data=None,
+            )
+            raise AppException(
+                "Could not parse resume for AI screening. Try again or re-upload.",
+                status_code=400,
+                code="resume_parse_failed",
+                details=str(exc),
+            ) from exc
+
         updated = resume_crud.save_parse_result(
             db,
             db_obj=resume,
@@ -505,9 +437,7 @@ class ResumeService:
             raw_text=raw_text,
             parsed_data=parsed.model_dump(),
         )
-        _apply_parsed_to_candidate(
-            db, candidate_id=updated.candidate_id, parsed=parsed
-        )
+        # Intentionally do NOT apply parsed fields to the candidate profile.
         refreshed = resume_crud.get(db, updated.id)
         assert refreshed is not None
         return refreshed

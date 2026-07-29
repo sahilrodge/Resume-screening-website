@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import ForeignKey, Numeric, Text, UniqueConstraint
+from sqlalchemy import ForeignKey, Numeric, String, Text, UniqueConstraint
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -65,6 +65,9 @@ class Application(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     suggestions: Mapped[list[Any] | None] = mapped_column(JSONB, nullable=True)
     ai_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     reasoning: Mapped[str | None] = mapped_column(Text, nullable=True)
+    scoring_engine: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    confidence: Mapped[float | None] = mapped_column(Numeric(5, 2), nullable=True)
+    score_fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     job: Mapped[Job] = relationship("Job", back_populates="applications")

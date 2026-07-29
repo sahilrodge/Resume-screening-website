@@ -1,6 +1,8 @@
 import { api, apiClient } from "@/lib/api"
 import type { Resume, ResumeListResponse, ResumePreview } from "@/types/resume"
 
+const UPLOAD_TIMEOUT_MS = 120_000
+
 function triggerBlobDownload(blob: Blob, fileName: string) {
   const objectUrl = URL.createObjectURL(blob)
   const anchor = document.createElement("a")
@@ -45,6 +47,16 @@ export const resumesApi = {
     const response = await api.get<Blob>(`/resumes/${id}/download`, {
       responseType: "blob",
       skipLoading: true,
+      params: { inline: true },
+    })
+    return response.data
+  },
+
+  async fetchBlobMine(id: string) {
+    const response = await api.get<Blob>(`/resumes/me/${id}/download`, {
+      responseType: "blob",
+      skipLoading: true,
+      params: { inline: true },
     })
     return response.data
   },
@@ -74,6 +86,7 @@ export const resumesApi = {
 
     const { data } = await api.post<Resume>("/resumes/upload", form, {
       skipLoading: true,
+      timeout: UPLOAD_TIMEOUT_MS,
       onUploadProgress: (event) => {
         if (!onProgress) return
         if (event.total && event.total > 0) {
@@ -101,6 +114,7 @@ export const resumesApi = {
     form.append("replace_existing", String(payload.replaceExisting ?? true))
     const { data } = await api.post<Resume>("/resumes/me/upload", form, {
       skipLoading: true,
+      timeout: UPLOAD_TIMEOUT_MS,
       onUploadProgress: (event) => {
         if (!onProgress) return
         if (event.total && event.total > 0) {

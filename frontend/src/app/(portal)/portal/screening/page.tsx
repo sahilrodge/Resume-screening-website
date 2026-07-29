@@ -1,37 +1,26 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useMemo, useState } from "react"
 import { Download } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { PageSkeleton } from "@/components/shared/page-skeleton"
+import { useCandidateSync } from "@/features/candidate/candidate-sync-provider"
 import { applicationsApi } from "@/services/applications"
-import type { ApplicationMatch } from "@/types/application"
 import { ApiError } from "@/types/api"
 
 export default function PortalScreeningPage() {
-  const [items, setItems] = useState<ApplicationMatch[]>([])
-  const [loading, setLoading] = useState(true)
+  const { applications, loading, error: syncError } = useCandidateSync()
   const [error, setError] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
 
-  useEffect(() => {
-    let cancelled = false
-    applicationsApi
-      .mine({ page: 1, page_size: 50, sort_by: "match_score", sort_order: "desc" })
-      .then((data) => {
-        if (!cancelled) setItems(data.items)
-      })
-      .catch(() => {
-        if (!cancelled) setError("Failed to load screening results.")
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
+  const items = useMemo(() => {
+    return [...applications].sort((a, b) => {
+      const aScore = a.match_score ?? -1
+      const bScore = b.match_score ?? -1
+      return bScore - aScore
+    })
+  }, [applications])
 
   async function downloadReport(id: string) {
     setBusyId(id)
@@ -45,6 +34,8 @@ export default function PortalScreeningPage() {
     }
   }
 
+  const displayError = error || syncError
+
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <header className="space-y-1">
@@ -57,12 +48,12 @@ export default function PortalScreeningPage() {
       </header>
 
       {loading ? <PageSkeleton withHeader={false} rows={4} /> : null}
-      {error ? (
+      {displayError ? (
         <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
-          {error}
+          {displayError}
         </p>
       ) : null}
-      {!loading && !error && items.length === 0 ? (
+      {!loading && !displayError && items.length === 0 ? (
         <p className="text-sm text-muted-foreground">
           No screening results yet. Apply to open roles or wait for a recruiter to
           screen your resume.
@@ -79,42 +70,57 @@ export default function PortalScreeningPage() {
                   {app.company_name ?? "Company"}
                 </p>
               </div>
-              <div className="flex flex-wrap items-center gap-3">
-                <p className="text-sm font-medium tabular-nums">
-                  {app.match_score != null
-                    ? `${Math.round(app.match_score)}% match`
-                    : "Pending"}
-                  {app.ats_score != null ? ` · ATS ${Math.round(app.ats_score)}` : ""}
-                </p>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={busyId === app.id}
-                  onClick={() => void downloadReport(app.id)}
-                >
-                  <Download data-icon="inline-start" />
-                  Report
-                </Button>
+              <div className="flex flex-wrap items-center gap-3 text-sm">
+                <span className="rounded-md bg-muted px-2 py-0.5 text-xs font-medium">
+                  {app.scoring_engine === "openai"
+                    ? "AI Score"
+                    : app.scoring_engine === "local"
+                      ? "Local Analysis"
+                      : "Pending"}
+                </span>
+                <span>
+                  Match{" "}
+                  <strong>
+                    {app.match_score != null ? `${Math.round(app.match_score)}%` : "—"}
+                  </strong>
+                </span>
+                <span>
+                  ATS{" "}
+                  <strong>
+                    {app.ats_score != null ? `${Math.round(app.ats_score)}%` : "—"}
+                  </strong>
+                </span>
+                {app.confidence != null ? (
+                  <span className="text-muted-foreground">
+                    Confidence {Math.round(app.confidence)}%
+                  </span>
+                ) : null}
               </div>
             </div>
             {app.summary ? (
               <p className="text-sm text-muted-foreground">{app.summary}</p>
             ) : null}
-            {(app.matching_skills?.length || app.missing_skills?.length) ? (
-              <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                {app.matching_skills?.length ? (
-                  <span>Matching: {app.matching_skills.join(", ")}</span>
-                ) : null}
-                {app.missing_skills?.length ? (
-                  <span>Gaps: {app.missing_skills.join(", ")}</span>
-                ) : null}
-              </div>
-            ) : null}
-            {(app.suggestions ?? []).length ? (
+            {app.matching_skills?.length ? (
               <p className="text-xs text-muted-foreground">
-                Suggestions: {(app.suggestions ?? []).slice(0, 2).join(" · ")}
+                Matching: {app.matching_skills.slice(0, 8).join(", ")}
               </p>
             ) : null}
+            {app.missing_skills?.length ? (
+              <p className="text-xs text-muted-foreground">
+                Gaps: {app.missing_skills.slice(0, 8).join(", ")}
+              </p>
+            ) : null}
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="gap-1.5"
+              disabled={busyId === app.id}
+              onClick={() => void downloadReport(app.id)}
+            >
+              <Download className="size-3.5" />
+              {busyId === app.id ? "Downloading…" : "Download report"}
+            </Button>
           </li>
         ))}
       </ul>

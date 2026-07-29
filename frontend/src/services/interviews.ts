@@ -34,6 +34,12 @@ export const interviewsApi = {
     })
   },
 
+  mine(params?: { page?: number; page_size?: number }) {
+    return apiClient.get<{ items: Interview[]; total: number }>("/interviews/me", {
+      params,
+    })
+  },
+
   create(payload: InterviewCreatePayload) {
     return apiClient.post<Interview>("/interviews", payload)
   },

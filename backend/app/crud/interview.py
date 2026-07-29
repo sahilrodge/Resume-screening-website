@@ -63,12 +63,19 @@ class CRUDInterview:
         skip: int = 0,
         limit: int = 50,
         application_id: uuid.UUID | None = None,
+        candidate_id: uuid.UUID | None = None,
     ) -> tuple[list[Interview], int]:
         filters = []
         if application_id:
             filters.append(Interview.application_id == application_id)
+        if candidate_id:
+            filters.append(Application.candidate_id == candidate_id)
 
         count_stmt = select(func.count()).select_from(Interview)
+        if candidate_id:
+            count_stmt = count_stmt.join(
+                Application, Interview.application_id == Application.id
+            )
         if filters:
             count_stmt = count_stmt.where(*filters)
         total = db.scalar(count_stmt) or 0
@@ -87,6 +94,8 @@ class CRUDInterview:
             .offset(skip)
             .limit(limit)
         )
+        if candidate_id:
+            stmt = stmt.join(Application, Interview.application_id == Application.id)
         if filters:
             stmt = stmt.where(*filters)
         items = list(db.scalars(stmt).unique().all())

@@ -21,7 +21,7 @@ _ACCEPT = "PDF, DOC, DOCX, TXT, or RTF"
 
 
 def _download_response(
-    kind: str, url_or_name: str, local_path
+    kind: str, url_or_name: str, local_path, *, inline: bool = False
 ) -> Response:
     if kind == "file" and local_path is not None:
         media_type, _ = mimetypes.guess_type(url_or_name)
@@ -29,7 +29,7 @@ def _download_response(
             path=local_path,
             filename=url_or_name,
             media_type=media_type or "application/octet-stream",
-            content_disposition_type="attachment",
+            content_disposition_type="inline" if inline else "attachment",
         )
     return RedirectResponse(url=url_or_name, status_code=status.HTTP_302_FOUND)
 
@@ -38,7 +38,7 @@ def _download_response(
     "/upload",
     response_model=ResumeResponse,
     status_code=status.HTTP_201_CREATED,
-    summary=f"Upload or replace resume ({_ACCEPT})",
+    summary=f"Upload or replace resume ({_ACCEPT}) — stores file only, no profile changes",
 )
 async def upload_resume(
     db: DBSession,
@@ -61,7 +61,7 @@ async def upload_resume(
     "/me/upload",
     response_model=ResumeResponse,
     status_code=status.HTTP_201_CREATED,
-    summary=f"Candidate upload or replace own resume ({_ACCEPT})",
+    summary=f"Candidate upload or replace own resume ({_ACCEPT}) — stores file only",
 )
 async def upload_my_resume(
     db: DBSession,
@@ -135,11 +135,12 @@ def download_my_resume(
     resume_id: uuid.UUID,
     db: DBSession,
     current_user: CandidateUser,
+    inline: Annotated[bool, Query()] = False,
 ) -> Response:
     kind, url_or_name, local_path = resume_service.resolve_download_mine(
         db, resume_id=resume_id, user=current_user
     )
-    return _download_response(kind, url_or_name, local_path)
+    return _download_response(kind, url_or_name, local_path, inline=inline)
 
 
 @router.delete(
@@ -213,9 +214,10 @@ def download_resume(
     resume_id: uuid.UUID,
     db: DBSession,
     _: RecruiterUser,
+    inline: Annotated[bool, Query()] = False,
 ) -> Response:
     kind, url_or_name, local_path = resume_service.resolve_download(db, resume_id)
-    return _download_response(kind, url_or_name, local_path)
+    return _download_response(kind, url_or_name, local_path, inline=inline)
 
 
 @router.delete(

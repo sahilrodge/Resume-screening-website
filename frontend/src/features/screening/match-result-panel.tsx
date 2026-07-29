@@ -1,9 +1,11 @@
 "use client"
 
+import type { ReactNode } from "react"
 import { motion } from "framer-motion"
 import { Check, Lightbulb, ThumbsDown, ThumbsUp, X } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
+import { Progress } from "@/components/ui/progress"
 import { cn } from "@/lib/utils"
 import type { ApplicationMatch } from "@/types/application"
 
@@ -25,6 +27,12 @@ function scoreTone(score: number) {
     text: "text-rose-600 dark:text-rose-400",
     label: "Weak fit",
   }
+}
+
+function engineLabel(engine?: ApplicationMatch["scoring_engine"]) {
+  if (engine === "openai") return "AI Score"
+  if (engine === "local") return "Local Analysis"
+  return null
 }
 
 export function MatchScoreRing({
@@ -98,7 +106,7 @@ function BulletList({
   empty,
 }: {
   title: string
-  icon: React.ReactNode
+  icon: ReactNode
   items: string[]
   empty: string
 }) {
@@ -127,18 +135,47 @@ export function MatchResultPanel({ result }: { result: ApplicationMatch }) {
   const score = result.match_score ?? 0
   const ats = result.ats_score ?? 0
   const tone = scoreTone(score)
+  const engine = engineLabel(result.scoring_engine)
+  const confidence =
+    result.confidence != null
+      ? Math.max(0, Math.min(100, result.confidence))
+      : null
 
   return (
     <div className="overflow-hidden rounded-2xl border border-border/70 bg-gradient-to-br from-card via-card to-accent/30 shadow-none">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 px-6 py-3 md:px-8">
+        <div className="flex flex-wrap items-center gap-2">
+          {engine ? (
+            <Badge variant={result.scoring_engine === "openai" ? "default" : "secondary"}>
+              {engine}
+            </Badge>
+          ) : null}
+          <span className="text-xs text-muted-foreground">
+            Overall ATS {Math.round(ats)}% · Match {Math.round(score)}%
+          </span>
+        </div>
+        {confidence != null ? (
+          <div className="min-w-[10rem] space-y-1">
+            <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+              <span>Confidence</span>
+              <span className="tabular-nums font-medium text-foreground">
+                {Math.round(confidence)}%
+              </span>
+            </div>
+            <Progress value={confidence} />
+          </div>
+        ) : null}
+      </div>
+
       <div className="grid gap-8 p-6 md:grid-cols-[200px_1fr] md:p-8">
         <div className="flex flex-col items-center justify-center gap-6 text-center">
           <div className="space-y-2">
-            <MatchScoreRing score={score} label="Match" />
-            <p className={cn("text-sm font-medium", tone.text)}>{tone.label}</p>
+            <MatchScoreRing score={ats} label="ATS" />
+            <p className="text-xs text-muted-foreground">Overall ATS Score</p>
           </div>
           <div className="space-y-2">
-            <MatchScoreRing score={ats} size={120} label="ATS" />
-            <p className="text-xs text-muted-foreground">Applicant Tracking Score</p>
+            <MatchScoreRing score={score} size={120} label="Match" />
+            <p className={cn("text-sm font-medium", tone.text)}>{tone.label}</p>
           </div>
           <p className="text-xs text-muted-foreground">
             {result.company_name
@@ -234,7 +271,7 @@ export function MatchResultPanel({ result }: { result: ApplicationMatch }) {
           <div className="rounded-xl border border-border/60 bg-background/60 p-4">
             <div className="mb-2 flex items-center gap-2">
               <Lightbulb className="size-4 text-primary" />
-              <h4 className="text-sm font-semibold">Resume suggestions</h4>
+              <h4 className="text-sm font-semibold">Recommendations</h4>
             </div>
             {(result.suggestions ?? []).length ? (
               <ul className="space-y-1.5 text-sm leading-relaxed text-muted-foreground">
@@ -243,7 +280,7 @@ export function MatchResultPanel({ result }: { result: ApplicationMatch }) {
                 ))}
               </ul>
             ) : (
-              <p className="text-sm text-muted-foreground">No suggestions yet.</p>
+              <p className="text-sm text-muted-foreground">No recommendations yet.</p>
             )}
           </div>
 

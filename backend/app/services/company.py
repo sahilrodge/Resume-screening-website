@@ -30,7 +30,7 @@ def _to_company_response(
         website=obj.website,
         industry=obj.industry,
         location=obj.location,
-        logo_url=obj.logo_url,
+        logo_url=None,  # Always use HirePulse brand mark in the UI — no external logos
         employee_count=obj.employee_count,
         culture=obj.culture,
         benefits=[str(item) for item in benefits if item],
@@ -45,7 +45,9 @@ class CompanyService:
     def create(self, db: Session, *, data: CompanyCreate) -> CompanyResponse:
         if company_crud.get_by_name(db, data.name):
             raise ConflictError("Company name already exists")
-        created = company_crud.create(db, obj_in=data)
+        # Never persist external company logos — UI uses HirePulse brand mark.
+        payload = data.model_copy(update={"logo_url": None})
+        created = company_crud.create(db, obj_in=payload)
         return _to_company_response(created, open_jobs_count=0)
 
     def get(self, db: Session, company_id: uuid.UUID) -> CompanyResponse | None:
@@ -78,7 +80,9 @@ class CompanyService:
             existing = company_crud.get_by_name(db, data.name)
             if existing and existing.id != obj.id:
                 raise ConflictError("Company name already exists")
-        updated = company_crud.update(db, db_obj=obj, obj_in=data)
+        # Strip logo updates so external images cannot be stored.
+        payload = data.model_copy(update={"logo_url": None})
+        updated = company_crud.update(db, db_obj=obj, obj_in=payload)
         count = company_crud.open_jobs_count(db, company_id)
         return _to_company_response(updated, open_jobs_count=count)
 

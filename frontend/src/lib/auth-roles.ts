@@ -58,6 +58,7 @@ export const ROLE_ALLOWED_PREFIXES: Record<UserRole, readonly string[]> = {
     "/portal/screening",
     "/portal/assistant",
     "/portal/jobs",
+    "/portal/saved-jobs",
     "/portal/companies",
     "/portal/notifications",
     "/portal/profile",

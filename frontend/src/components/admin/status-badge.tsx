@@ -15,7 +15,7 @@ const toneMap: Record<string, string> = {
   Trial: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
   Away: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
   Draft: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
-  uploaded: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+  uploaded: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
   warning: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
   New: "bg-primary/15 text-primary",
   Closed: "bg-muted text-muted-foreground",

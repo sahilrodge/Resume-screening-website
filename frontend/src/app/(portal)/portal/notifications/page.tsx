@@ -1,12 +1,12 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { Bell } from "lucide-react"
 
 import { notificationsApi } from "@/services/notifications"
-import type { AppNotification } from "@/types/notification"
 import { PageSkeleton } from "@/components/shared/page-skeleton"
 import { Button } from "@/components/ui/button"
+import { useCandidateSync } from "@/features/candidate/candidate-sync-provider"
 
 function formatWhen(iso: string) {
   try {
@@ -20,40 +20,29 @@ function formatWhen(iso: string) {
 }
 
 export default function PortalNotificationsPage() {
-  const [items, setItems] = useState<AppNotification[]>([])
-  const [unread, setUnread] = useState(0)
-  const [loading, setLoading] = useState(true)
+  const {
+    notifications,
+    unreadCount,
+    loading,
+    error: syncError,
+    setNotifications,
+    setUnreadCount,
+    refresh,
+  } = useCandidateSync()
   const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    let cancelled = false
-    notificationsApi
-      .list({ page: 1, page_size: 50 })
-      .then((res) => {
-        if (cancelled) return
-        setItems(res.items)
-        setUnread(res.unread_count)
-      })
-      .catch(() => {
-        if (!cancelled) setError("Could not load notifications.")
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
 
   async function markAll() {
     try {
       const res = await notificationsApi.markAllRead()
-      setUnread(res.unread_count)
-      setItems((prev) => prev.map((n) => ({ ...n, is_read: true })))
+      setUnreadCount(res.unread_count)
+      setNotifications(notifications.map((n) => ({ ...n, is_read: true })))
+      await refresh({ silent: true })
     } catch {
       setError("Could not mark notifications as read.")
     }
   }
+
+  const displayError = error || syncError
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -63,24 +52,29 @@ export default function PortalNotificationsPage() {
             Notifications
           </h1>
           <p className="text-sm text-muted-foreground">
-            {unread > 0 ? `${unread} unread` : "You're all caught up"}
+            {unreadCount > 0 ? `${unreadCount} unread` : "You're all caught up"}
           </p>
         </div>
-        {unread > 0 ? (
-          <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => void markAll()}>
+        {unreadCount > 0 ? (
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full sm:w-auto"
+            onClick={() => void markAll()}
+          >
             Mark all read
           </Button>
         ) : null}
       </header>
 
       {loading ? <PageSkeleton withHeader={false} rows={5} /> : null}
-      {error ? (
+      {displayError ? (
         <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
-          {error}
+          {displayError}
         </p>
       ) : null}
 
-      {!loading && items.length === 0 ? (
+      {!loading && notifications.length === 0 ? (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Bell className="size-4" />
           No notifications yet.
@@ -88,19 +82,19 @@ export default function PortalNotificationsPage() {
       ) : null}
 
       <ul className="divide-y divide-border">
-        {items.map((item) => (
+        {notifications.map((item) => (
           <li key={item.id} className="space-y-1 py-4">
             <div className="flex items-center justify-between gap-3">
-              <p className={`text-sm ${item.is_read ? "text-muted-foreground" : "font-medium"}`}>
+              <p
+                className={`text-sm ${item.is_read ? "text-muted-foreground" : "font-medium"}`}
+              >
                 {item.title}
               </p>
               <span className="shrink-0 text-xs text-muted-foreground">
                 {formatWhen(item.created_at)}
               </span>
             </div>
-            {item.message ? (
-              <p className="text-sm text-muted-foreground">{item.message}</p>
-            ) : null}
+            <p className="text-sm text-muted-foreground">{item.message}</p>
           </li>
         ))}
       </ul>

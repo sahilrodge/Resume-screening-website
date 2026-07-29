@@ -1,6 +1,7 @@
 import {
   BarChart3,
   Bell,
+  Bookmark,
   Bot,
   BriefcaseBusiness,
   Building2,
@@ -50,6 +51,12 @@ export const candidateNav: NavItem[] = [
     href: "/portal/jobs",
     icon: BriefcaseBusiness,
     description: "Browse open roles and your applications",
+  },
+  {
+    title: "Saved Jobs",
+    href: "/portal/saved-jobs",
+    icon: Bookmark,
+    description: "Roles you bookmarked to apply later",
   },
   {
     title: "Notifications",

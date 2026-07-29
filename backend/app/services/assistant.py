@@ -10,6 +10,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload, selectinload
 
+from app.ai.hirepulse_product_guide import product_capabilities_block
 from app.ai.recruitment_assistant import (
     AssistantMode,
     run_recruitment_assistant,
@@ -404,37 +405,11 @@ def _build_context(
             lookup.append(f'application "{cand_name} · {job_label}" => {app.id}')
 
     if mode == "candidate":
-        parts.append(
-            "CAPABILITIES:\n"
-            "- Resume review using CANDIDATE PROFILE / RESUME.\n"
-            "- ATS keyword and formatting improvements.\n"
-            "- Interview preparation for preferred role or FOCUSED JOB.\n"
-            "- Career guidance and skill-gap advice.\n"
-            "- Personalized job recommendations from OPEN JOBS.\n"
-            "- Always refer to jobs as Company Name - Job Title and never mention database IDs."
-        )
+        parts.append(product_capabilities_block("candidate"))
     elif mode == "admin":
-        parts.append(
-            "CAPABILITIES:\n"
-            "- Interpret PLATFORM ANALYTICS KPIs and funnel.\n"
-            "- Surface platform and hiring insights.\n"
-            "- Recommend operational next steps grounded in metrics.\n"
-            "- Hiring suggestions, candidate comparison, and JD drafting when context allows.\n"
-            "- Schedule interview via action when ACTION REFERENCE has an application mapping "
-            "and scheduled_at is known.\n"
-            "- In replies, use Candidate Name, Company Name, and Job Title only — never UUIDs."
-        )
+        parts.append(product_capabilities_block("admin"))
     else:
-        parts.append(
-            "CAPABILITIES:\n"
-            "- Hiring suggestions and screening guidance.\n"
-            "- Candidate comparison using CANDIDATE PROFILE / JOB APPLICANTS.\n"
-            "- Job description generation and improvement.\n"
-            "- Explain open roles and discuss fit.\n"
-            "- Schedule interview via action when ACTION REFERENCE has an application mapping "
-            "and scheduled_at is known.\n"
-            "- In replies, use Candidate Name, Company Name, and Job Title only — never UUIDs."
-        )
+        parts.append(product_capabilities_block("recruiter"))
 
     # Deduplicate lookup lines while preserving order
     seen: set[str] = set()
@@ -458,58 +433,59 @@ def _build_context(
 def _welcome_content(mode: AssistantMode) -> str:
     if mode == "candidate":
         return (
-            "Hi — I'm your HirePulse career coach.\n\n"
+            "Hi — I'm your HirePulse career coach and product guide.\n\n"
             "## I can help with\n"
+            "- How HirePulse works (resume upload, jobs, screening, ATS, profile, settings)\n"
             "- Resume review and stronger impact bullets\n"
             "- ATS keyword and formatting tips\n"
             "- Interview preparation (STAR answers)\n"
             "- Career guidance for your preferred roles\n\n"
-            "## Next step\n"
-            "Tell me what you want to work on first."
+            "## Ready when you are\n"
+            "Ask a question or give me a task — I'll complete it in one reply using your profile context."
         )
     if mode == "admin":
         return (
             "Hi — I'm the HirePulse platform insights assistant.\n\n"
             "## I can help with\n"
+            "- How admin features work across HirePulse\n"
             "- Analytics and KPI interpretation\n"
-            "- Hiring funnel health\n"
-            "- Job / recruiter performance insights\n"
+            "- Hiring funnel health and job performance\n"
             "- Operational next steps from live data\n\n"
-            "## Next step\n"
-            "Ask about a metric, funnel stage, or job that needs attention."
+            "## Ready when you are\n"
+            "Ask about a metric or page — I'll answer directly without extra confirmation."
         )
     return (
         "Hi — I'm the HirePulse recruitment assistant.\n\n"
         "## I can help with\n"
+        "- How to use HirePulse (jobs, screening, ATS, interviews, companies, settings)\n"
         "- Hiring plans and screening questions\n"
-        "- Candidate comparison\n"
-        "- Job description drafts\n"
+        "- Candidate comparison and JD drafts\n"
         "- Interview scheduling when details are available\n\n"
-        "## Next step\n"
-        "Pick a focus, or attach a job/candidate in the context controls."
+        "## Ready when you are\n"
+        "Ask for a deliverable or how-to — I'll complete it in one reply."
     )
 
 
 def _default_follow_ups(mode: AssistantMode) -> list[str]:
     if mode == "candidate":
         return [
-            "Review my resume and suggest improvements",
+            "How do I upload my resume?",
+            "How does Resume Screening work?",
             "How can I make my resume more ATS-friendly?",
-            "Help me prepare for interviews",
-            "Give me career advice for my preferred role",
+            "Where do I find open jobs?",
         ]
     if mode == "admin":
         return [
+            "How does Resume Screening work?",
             "Summarize platform hiring health",
-            "Which jobs underperform on applications?",
+            "Where do I manage users and recruiters?",
             "Explain our hiring funnel bottlenecks",
-            "What should we improve this month?",
         ]
     return [
-        "Suggest a hiring plan for this role",
-        "Compare the top applicants for this job",
+        "How do I run Resume Screening?",
+        "What does the ATS score mean?",
         "Draft a job description for this opening",
-        "Help me prepare interview questions",
+        "How do interviews work in HirePulse?",
     ]
 
 

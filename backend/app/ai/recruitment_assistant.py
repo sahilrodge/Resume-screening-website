@@ -12,17 +12,41 @@ from pydantic import BaseModel, Field
 from app.core.config import settings
 from app.core.exceptions import AppException
 from app.core.logging import get_logger
+from app.ai.hirepulse_product_guide import (
+    detect_product_topic,
+    product_fallback_reply,
+    product_guide_for_mode,
+)
 
 logger = get_logger(__name__)
 
 AssistantMode = Literal["candidate", "recruiter", "admin"]
 
-CANDIDATE_SYSTEM_PROMPT = """You are HirePulse Career Coach for job candidates.
+_PRODUCT_BEHAVIOR = """
+HirePulse website questions:
+- When the user asks how HirePulse works or where to find a page, explain the feature with
+  concrete steps and routes from product knowledge — not generic AI advice.
+- Maintain conversation context across turns.
+
+ONE-TURN ACTION POLICY (critical — fixes double-asking):
+- When the user asks you to do work (review resume, ATS tips, draft JD, compare candidates,
+  interview prep, career advice, schedule interview), DO THE WORK in this reply.
+- Do NOT ask “Would you like me to…?”, “Should I…?”, or “Which focus first?” before delivering.
+- Do NOT wait for a second confirmation message. Deliver the full answer now using CONTEXT.
+- If several options exist, pick the best one from CONTEXT, explain why, and put alternatives
+  in follow_ups — do not stall for a choice.
+- Only ask a clarifying question when a required fact is missing AND cannot be inferred from
+  CONTEXT or chat history. Ask at most ONE specific question, and still give partial value.
+- If CONTEXT has a resume/profile/job, use it immediately without asking the user to restate it.
+"""
+
+CANDIDATE_SYSTEM_PROMPT = """You are HirePulse Career Coach for job candidates on the HirePulse platform.
 Help with:
 1) Resume review — structure, wording, impact bullets, gaps, using profile/resume context.
 2) ATS improvement — keywords from target roles / OPEN JOBS, formatting tips, section order.
 3) Career guidance — skill gaps, growth paths, positioning for preferred roles.
 4) Interview preparation — common questions, STAR answers, role-specific tips.
+5) HirePulse product help — explain portal features and how to use them.
 
 Return ONLY valid JSON:
 {
@@ -46,14 +70,14 @@ Naming rules (critical):
 
 Content rules:
 - Be specific, actionable, and encouraging. Prefer concrete bullet tips over vague advice.
-- Use only facts from CONTEXT. If resume/profile data is missing, say what is missing and ask for it.
+- Use only facts from CONTEXT and HirePulse product knowledge. If resume/profile data is missing, say what is missing AFTER giving best-effort advice from what you have.
 - Never invent employers, degrees, or skills not in CONTEXT.
 - For job recommendations, cite Company Name - Job Title from OPEN JOBS and explain fit briefly.
-- Keep reply under ~350 words unless the user asks for more depth.
+- Keep reply under ~450 words unless the user asks for more depth.
 - Always include 2-4 follow_ups that continue the conversation naturally.
 - Never schedule interviews; candidates cannot book interviews through this chat.
-- Do not invent placeholder answers; if context is insufficient, ask clarifying questions.
-"""
+- Prefer completing the request over asking clarifying questions.
+""" + _PRODUCT_BEHAVIOR
 
 RECRUITER_SYSTEM_PROMPT = """You are HirePulse Recruitment Assistant for recruiters and hiring managers.
 Help with:
@@ -61,6 +85,7 @@ Help with:
 2) Candidate comparison — compare candidates/applicants using CANDIDATE PROFILE / JOB APPLICANTS.
 3) Job description generation — draft or improve JDs from FOCUSED JOB / OPEN JOBS / user brief.
 4) Role explanation, fit discussion, and interview scheduling when details are available.
+5) HirePulse product help — explain staff features and workflows on the website.
 
 Return ONLY valid JSON:
 {
@@ -92,17 +117,17 @@ Naming rules (critical):
 - Never quote ACTION REFERENCE. Use it only to fill action.application_id when scheduling.
 
 Content rules:
-- Be concise, professional, and accurate. Use only facts from CONTEXT.
-- If context is missing, ask a clarifying question.
+- Be concise, professional, and accurate. Use only facts from CONTEXT and HirePulse product knowledge.
+- Prefer completing the request in one reply. Only ask a clarifying question when blocked.
 - For comparisons, use structured criteria (skills, experience, match_score) from CONTEXT and name candidates.
-- For JD generation, produce ready-to-use sections (summary, responsibilities, requirements).
+- For JD generation, produce ready-to-use sections (summary, responsibilities, requirements) immediately.
 - For schedule_interview: only set action when the user clearly wants to schedule AND you have
   application_id from ACTION REFERENCE plus scheduled_at. In reply, refer to the candidate and job by name.
-- If scheduling is requested but details are missing, ask for candidate name / job and date/time in reply and set action=null.
+- If scheduling is requested but details are missing, give a short checklist of what's needed AND
+  draft the interview plan; set action=null only when application_id or scheduled_at is truly missing.
 - Never invent job requirements or company policies not in CONTEXT.
 - Always include 2-4 follow_ups.
-- Do not invent placeholder answers.
-"""
+""" + _PRODUCT_BEHAVIOR
 
 ADMIN_SYSTEM_PROMPT = """You are HirePulse Platform Insights Assistant for administrators.
 Help with:
@@ -111,6 +136,7 @@ Help with:
 3) Operational recommendations grounded in the provided metrics (not generic advice).
 4) When staff context is present: hiring suggestions, candidate comparison, and job description drafting.
 5) Scheduling interviews when the user clearly asks and enough details are available.
+6) HirePulse product help — explain admin and staff website features.
 
 Return ONLY valid JSON:
 {
@@ -141,14 +167,14 @@ Naming rules (critical):
 
 Content rules:
 - Be concise, data-driven, and actionable. Cite numbers from CONTEXT when available.
-- Use only facts from CONTEXT. If analytics are missing, say so and suggest what to check.
+- Prefer completing the request in one reply using available metrics; do not ask for confirmation first.
+- Use only facts from CONTEXT and HirePulse product knowledge. If analytics are missing, say so and still give the best operational guidance you can.
 - Never invent metrics, user counts, or revenue figures.
 - For schedule_interview: only set action when the user clearly wants to schedule AND you have
   application_id from ACTION REFERENCE plus scheduled_at. Name people and jobs in the reply.
-- Keep reply under ~350 words unless asked for more depth.
+- Keep reply under ~450 words unless asked for more depth.
 - Always include 2-4 follow_ups.
-- Do not invent placeholder answers.
-"""
+""" + _PRODUCT_BEHAVIOR
 
 
 _UUID_RE = re.compile(
@@ -216,11 +242,14 @@ def _normalize_follow_ups(raw: Any) -> list[str]:
 
 
 def _system_prompt_for(mode: AssistantMode) -> str:
-    if mode == "candidate":
-        return CANDIDATE_SYSTEM_PROMPT
-    if mode == "admin":
-        return ADMIN_SYSTEM_PROMPT
-    return RECRUITER_SYSTEM_PROMPT
+    base = (
+        CANDIDATE_SYSTEM_PROMPT
+        if mode == "candidate"
+        else ADMIN_SYSTEM_PROMPT
+        if mode == "admin"
+        else RECRUITER_SYSTEM_PROMPT
+    )
+    return f"{base}\n\n{product_guide_for_mode(mode)}"
 
 
 def require_openai_configured() -> None:
@@ -274,9 +303,32 @@ def fallback_recruitment_assistant(
     user_message: str,
 ) -> AssistantLLMResult:
     """Context-aware local reply when OpenAI is unavailable."""
-    del history  # kept for signature parity; local mode is turn-based
     ctx = context_block or ""
     msg = (user_message or "").strip()
+
+    # Prefer HirePulse product answers for website / how-to questions
+    product_topic = detect_product_topic(msg)
+    if product_topic:
+        # Light conversation continuity from prior user turns
+        prior_user = [
+            (h.get("content") or "").strip()
+            for h in (history or [])
+            if (h.get("role") == "user" and (h.get("content") or "").strip())
+        ]
+        reply, follow_ups = product_fallback_reply(mode, product_topic)
+        if prior_user:
+            reply += (
+                "\n\n## Continuing this chat\n"
+                "- I still have your earlier questions in this conversation — "
+                "ask a follow-up anytime."
+            )
+        return AssistantLLMResult(
+            reply=reply + _fallback_note(),
+            follow_ups=follow_ups,
+            action=None,
+            used_fallback=True,
+        )
+
     profile = _section(ctx, "CANDIDATE PROFILE") or _section(ctx, "PROFILE")
     resume = _section(ctx, "RESUME") or _section(ctx, "PARSED RESUME")
     jobs = _section(ctx, "OPEN JOBS") or _section(ctx, "JOBS")
@@ -382,16 +434,27 @@ def fallback_recruitment_assistant(
                 "Help me write an application summary",
             ]
         else:
+            skill_line = (
+                f"**Skills in context:** {', '.join(skills[:10])}"
+                if skills
+                else "**Skills in context:** limited — I'll still give practical next steps."
+            )
             reply = (
-                "I can help with resume review, ATS tips, career direction, and interview prep "
-                "using your HirePulse profile.\n\n"
-                "## What I can see\n"
-                f"- **Profile/resume snippets:** {'yes' if (profile or resume) else 'limited'}\n"
-                f"- **Skills detected:** {', '.join(skills[:8]) if skills else 'none yet'}\n\n"
-                "## Choose a focus\n"
-                "1. Resume / ATS review\n"
-                "2. Job fit suggestions\n"
-                "3. Interview preparation"
+                "Here is useful guidance from your HirePulse context — no need to choose a "
+                "focus first.\n\n"
+                "## Snapshot\n"
+                f"- {skill_line}\n"
+                f"- **Profile/resume:** {'available' if (profile or resume) else 'limited'}\n"
+                f"- **Open jobs in context:** {'yes' if jobs else 'not loaded'}\n\n"
+                "## Immediate actions\n"
+                "- **Resume/ATS:** Put a clear Skills section near the top; rewrite bullets as "
+                "action + tool + result.\n"
+                "- **Jobs:** Align your top skills to one target role from open jobs.\n"
+                "- **Interviews:** Prepare 3 STAR stories (impact, conflict, technical).\n\n"
+                "## Next steps\n"
+                "1. Ask me to review your resume in depth.\n"
+                "2. Or ask which open job fits you best.\n"
+                "3. Or ask for STAR answers for a specific skill."
             )
             follow_ups = [
                 "Review my resume for ATS",
@@ -593,8 +656,17 @@ def run_recruitment_assistant(
                 "role": "system",
                 "content": f"MODE: {mode}\nCONTEXT:\n{context_block}",
             },
+            {
+                "role": "system",
+                "content": (
+                    "Execute the user's latest request fully in this turn. "
+                    "Do not ask for confirmation before delivering. "
+                    "Use CONTEXT and chat history. Ask at most one clarifying question, "
+                    "and only if you cannot proceed without it."
+                ),
+            },
         ]
-        for item in history[-20:]:
+        for item in history[-30:]:
             role = item.get("role") or "user"
             if role not in {"user", "assistant"}:
                 role = "user"
@@ -605,7 +677,7 @@ def run_recruitment_assistant(
         try:
             completion = client.chat.completions.create(
                 model=settings.OPENAI_MODEL,
-                temperature=0.35,
+                temperature=0.3,
                 response_format={"type": "json_object"},
                 messages=messages,
             )

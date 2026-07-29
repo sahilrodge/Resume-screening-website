@@ -38,7 +38,7 @@ def _to_response(obj: Job) -> JobResponse:
         id=obj.id,
         company_id=obj.company_id,
         company_name=obj.company.name if obj.company else None,
-        company_logo_url=obj.company.logo_url if obj.company else None,
+        company_logo_url=None,  # Always use HirePulse brand mark in the UI — no external logos
         recruiter_id=obj.recruiter_id,
         recruiter_name=recruiter_name,
         title=obj.title,

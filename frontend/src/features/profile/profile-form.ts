@@ -14,7 +14,7 @@ export type ProfileDraft = {
   preferredJobRole: string
   preferredLocation: string
   expectedSalary: string
-  skillsText: string
+  skills: string[]
   education: EducationItem[]
   experience: ExperienceItem[]
   companyName: string
@@ -88,7 +88,7 @@ export function draftFromProfile(data: Profile): ProfileDraft {
       data.expected_salary == null || data.expected_salary === ""
         ? ""
         : String(data.expected_salary),
-    skillsText: (data.skills ?? []).join(", "),
+    skills: [...(data.skills ?? [])],
     education: (data.education ?? []).map((item) => ({
       institution: item.institution ?? "",
       degree: item.degree ?? "",
@@ -194,8 +194,31 @@ export function buildUpdatePayload(
       ...base,
       phone: draft.phone.trim() || null,
       location: draft.location.trim() || null,
+      date_of_birth: draft.dateOfBirth.trim() || null,
+      summary: draft.summary.trim() || null,
       linkedin_url: draft.linkedin.trim() || null,
       github_url: draft.github.trim() || null,
+      portfolio_url: draft.portfolio.trim() || null,
+      preferred_job_role: draft.preferredJobRole.trim() || null,
+      preferred_location: draft.preferredLocation.trim() || null,
+      expected_salary: draft.expectedSalary.trim()
+        ? Number(draft.expectedSalary)
+        : null,
+      skills: draft.skills,
+      education: draft.education.map((item) => ({
+        institution: (item.institution || "").trim() || null,
+        degree: (item.degree || "").trim() || null,
+        field: (item.field || "").trim() || null,
+        start_date: (item.start_date || "").trim() || null,
+        end_date: (item.end_date || "").trim() || null,
+      })),
+      experience: draft.experience.map((item) => ({
+        company: (item.company || "").trim() || null,
+        title: (item.title || "").trim() || null,
+        start_date: (item.start_date || "").trim() || null,
+        end_date: (item.end_date || "").trim() || null,
+        description: (item.description || "").trim() || null,
+      })),
     }
   }
 

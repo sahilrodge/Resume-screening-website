@@ -379,8 +379,9 @@ EMPLOYMENT_MIX = [
 ]
 
 
-def logo_url(domain: str) -> str:
-    return f"https://logo.clearbit.com/{domain}"
+def logo_url(domain: str) -> str | None:
+    # HirePulse uses the app brand mark in the UI — do not seed external logos.
+    return None
 
 
 EMPLOYEE_COUNTS: dict[str, str] = {

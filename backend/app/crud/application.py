@@ -70,6 +70,7 @@ class CRUDApplication:
         resume_id: uuid.UUID,
         match: MatchResult,
         status: ApplicationStatus = ApplicationStatus.SCREENING,
+        score_fingerprint: str | None = None,
     ) -> Application:
         db_obj.resume_id = resume_id
         db_obj.match_score = match.match_score
@@ -81,6 +82,10 @@ class CRUDApplication:
         db_obj.suggestions = match.suggestions
         db_obj.ai_summary = match.summary
         db_obj.reasoning = match.reasoning
+        db_obj.scoring_engine = match.scoring_engine
+        db_obj.confidence = match.confidence
+        if score_fingerprint is not None:
+            db_obj.score_fingerprint = score_fingerprint
         db_obj.status = status
         db.add(db_obj)
         db.commit()

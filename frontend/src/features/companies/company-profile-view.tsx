@@ -2,7 +2,6 @@
 
 import Link from "next/link"
 import {
-  Building2,
   ExternalLink,
   Globe,
   MapPin,
@@ -11,6 +10,7 @@ import {
 } from "lucide-react"
 import type { ReactNode } from "react"
 
+import { HirePulseMark } from "@/components/brand/hirepulse-mark"
 import { Badge } from "@/components/ui/badge"
 import { buttonVariants } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
@@ -66,18 +66,7 @@ export function CompanyProfileView({
       </Link>
 
       <header className="flex flex-col gap-4 sm:flex-row sm:items-start">
-        {company.logo_url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={company.logo_url}
-            alt={`${company.name} logo`}
-            className="size-16 shrink-0 rounded-xl border border-border bg-background object-contain p-2"
-          />
-        ) : (
-          <div className="flex size-16 shrink-0 items-center justify-center rounded-xl border border-border bg-muted/40">
-            <Building2 className="size-7 text-muted-foreground" />
-          </div>
-        )}
+        <HirePulseMark size="xl" />
         <div className="min-w-0 space-y-2">
           <h1 className="font-heading text-2xl font-semibold tracking-tight sm:text-3xl">
             {company.name}

@@ -2,10 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { Building2, Plus } from "lucide-react"
+import { Plus } from "lucide-react"
 import { motion } from "framer-motion"
 
 import { DataToolbar } from "@/components/admin/data-toolbar"
+import { HirePulseMark } from "@/components/brand/hirepulse-mark"
 import { FadeIn, PageTransition } from "@/components/motion/page-transition"
 import { PageHeader } from "@/components/shared/page-header"
 import { Button, buttonVariants } from "@/components/ui/button"
@@ -208,18 +209,9 @@ export default function CompaniesPage() {
               <Card className="h-full border-border/70 bg-card/80 shadow-none backdrop-blur transition-all duration-300 hover:-translate-y-1 hover:border-primary/30">
                 <CardHeader className="flex flex-row items-start justify-between gap-3">
                   <div className="flex items-start gap-3">
-                    {company.logo_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={company.logo_url}
-                        alt=""
-                        className="size-10 rounded-md border border-border bg-background object-contain p-1"
-                      />
-                    ) : (
-                      <span className="rounded-xl bg-primary/10 p-2 text-primary">
-                        <Building2 className="size-4" />
-                      </span>
-                    )}
+                    <span className="mt-0.5">
+                      <HirePulseMark size="sm" />
+                    </span>
                     <div className="space-y-1">
                       <CardTitle className="font-heading text-lg">
                         {company.name}

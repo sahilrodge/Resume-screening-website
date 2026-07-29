@@ -15,6 +15,7 @@ import {
 } from "lucide-react"
 
 import { FadeIn, PageTransition } from "@/components/motion/page-transition"
+import { HirePulseMark } from "@/components/brand/hirepulse-mark"
 import { Badge } from "@/components/ui/badge"
 import { Button, buttonVariants } from "@/components/ui/button"
 import {
@@ -27,6 +28,7 @@ import {
 } from "@/components/ui/dialog"
 import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
+import { useCandidateSync } from "@/features/candidate/candidate-sync-provider"
 import {
   formatEmploymentType,
   formatJobDate,
@@ -36,7 +38,6 @@ import {
 } from "@/features/jobs/format"
 import { applicationsApi } from "@/services/applications"
 import { jobsApi } from "@/services/jobs"
-import { resumesApi } from "@/services/resumes"
 import { ApiError } from "@/types/api"
 import type { Job } from "@/types/job"
 import { cn } from "@/lib/utils"
@@ -45,28 +46,27 @@ export default function PortalJobDetailPage() {
   const params = useParams<{ id: string }>()
   const router = useRouter()
   const jobId = params.id
+  const {
+    applications,
+    hasResume,
+    savedJobIds,
+    markJobSaved,
+    refresh,
+  } = useCandidateSync()
 
   const [job, setJob] = useState<Job | null>(null)
-  const [hasResume, setHasResume] = useState(false)
-  const [alreadyApplied, setAlreadyApplied] = useState(false)
-  const [saved, setSaved] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [applying, setApplying] = useState(false)
   const [saving, setSaving] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
 
+  const alreadyApplied = applications.some((a) => a.job_id === jobId)
+  const saved = savedJobIds.has(jobId)
+
   const load = useCallback(async () => {
-    const [jobData, apps, resumes, savedIds] = await Promise.all([
-      jobsApi.get(jobId),
-      applicationsApi.mine({ page: 1, page_size: 100 }),
-      resumesApi.listMine({ page: 1, page_size: 1 }),
-      jobsApi.savedIds().catch(() => ({ job_ids: [] as string[] })),
-    ])
+    const jobData = await jobsApi.get(jobId)
     setJob(jobData)
-    setAlreadyApplied(apps.items.some((a) => a.job_id === jobId))
-    setHasResume(resumes.total > 0 || resumes.items.length > 0)
-    setSaved(savedIds.job_ids.includes(jobId))
   }, [jobId])
 
   useEffect(() => {
@@ -104,7 +104,7 @@ export default function PortalJobDetailPage() {
     setError(null)
     try {
       await applicationsApi.apply({ job_id: job.id })
-      setAlreadyApplied(true)
+      await refresh({ silent: true })
       setConfirmOpen(true)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not apply.")
@@ -120,10 +120,10 @@ export default function PortalJobDetailPage() {
     try {
       if (saved) {
         await jobsApi.unsave(job.id)
-        setSaved(false)
+        markJobSaved(job.id, false)
       } else {
         await jobsApi.save(job.id)
-        setSaved(true)
+        markJobSaved(job.id, true)
       }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not update saved job.")
@@ -170,20 +170,9 @@ export default function PortalJobDetailPage() {
                 <div className="flex items-start gap-3">
                   <Link
                     href={`/portal/companies/${job.company_id}`}
-                    className="shrink-0"
+                    className="mt-1 shrink-0"
                   >
-                    {job.company_logo_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={job.company_logo_url}
-                        alt=""
-                        className="mt-1 size-12 rounded-md border border-border bg-background object-contain p-1"
-                      />
-                    ) : (
-                      <div className="mt-1 flex size-12 items-center justify-center rounded-md border border-border bg-muted/40">
-                        <Building2 className="size-5 text-muted-foreground" />
-                      </div>
-                    )}
+                    <HirePulseMark size="lg" />
                   </Link>
                   <div className="space-y-1">
                     <h1 className="font-heading text-2xl font-semibold tracking-tight">

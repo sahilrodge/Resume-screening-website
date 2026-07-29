@@ -7,9 +7,9 @@ export default function PortalAssistantPage() {
     <AssistantChat
       mode="candidate"
       title="AI Assistant"
-      description="Get resume review, ATS improvements, interview prep, and career guidance based on your profile. Chat history is saved."
-      emptyHint="Start a chat to review your resume, improve ATS fit, prepare for interviews, or get career advice."
-      inputPlaceholder="Ask about resume review, ATS tips, interviews, or career guidance…"
+      description="Ask how HirePulse works (resume upload, jobs, screening, ATS, profile, settings) or get resume review, interview prep, and career guidance. Conversation context is kept."
+      emptyHint="Try: “How do I upload my resume?” or ask for ATS tips, interview prep, or career advice."
+      inputPlaceholder="Ask about HirePulse features, resume review, ATS, interviews, or career guidance…"
     />
   )
 }

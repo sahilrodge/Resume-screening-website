@@ -49,6 +49,8 @@ class ApplicationResponse(BaseModel):
     suggestions: list[str] = Field(default_factory=list)
     summary: str | None = None
     reasoning: str | None = None
+    scoring_engine: Literal["openai", "local"] | None = None
+    confidence: float | None = None
     created_at: datetime
     updated_at: datetime
 

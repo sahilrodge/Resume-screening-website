@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useSearchParams } from "next/navigation"
-import { Camera } from "lucide-react"
+import { Camera, Loader2 } from "lucide-react"
 
 import { FadeIn, PageTransition } from "@/components/motion/page-transition"
 import { PageHeader } from "@/components/shared/page-header"
@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
 import { useAuth } from "@/features/auth/auth-provider"
+import { useCandidateSyncOptional } from "@/features/candidate/candidate-sync-provider"
 import {
   buildUpdatePayload,
   draftFromProfile,
@@ -29,18 +30,22 @@ import {
   type ProfileFieldErrors,
 } from "@/features/profile/profile-form"
 import { AboutMeSection } from "@/features/profile/about-me-section"
+import {
+  CandidateActivitySections,
+  CandidateLoginInfoSection,
+} from "@/features/profile/candidate-activity-sections"
 import { EducationSection } from "@/features/profile/education-section"
 import { ExperienceSection } from "@/features/profile/experience-section"
 import { LocationCascading } from "@/features/profile/location-cascading"
 import { SkillsSection } from "@/features/profile/skills-section"
 import { LatestResumePanel } from "@/features/resumes/latest-resume-panel"
+import { RESUME_MAX_SIZE_MB } from "@/features/resumes/resume-upload"
 import { authStorage } from "@/lib/auth-storage"
 import { cn } from "@/lib/utils"
 import { profileApi } from "@/services/profile"
 import { ApiError } from "@/types/api"
 import type { Profile } from "@/types/profile"
 
-const AUTO_SAVE_MS = 1600
 const SUCCESS_DISMISS_MS = 4000
 
 function initials(name?: string | null) {
@@ -60,45 +65,41 @@ function FieldError({ message }: { message?: string }) {
 
 export function ProfilePageClient() {
   const { refreshUser } = useAuth()
+  const candidateSync = useCandidateSyncOptional()
   const searchParams = useSearchParams()
   const focusNameOnEdit = searchParams.get("edit") === "1"
   const [profile, setProfile] = useState<Profile | null>(null)
   const [baseline, setBaseline] = useState<ProfileDraft | null>(null)
   const [draft, setDraft] = useState<ProfileDraft | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(!candidateSync?.profile)
   const [saving, setSaving] = useState(false)
-  const [autoSaving, setAutoSaving] = useState(false)
   const [fieldErrors, setFieldErrors] = useState<ProfileFieldErrors>({})
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState<string | null>(null)
-  const [statusHint, setStatusHint] = useState<string | null>(null)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [avatarProgress, setAvatarProgress] = useState(0)
 
   const saveLock = useRef(false)
-  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const successTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const skipAutoSaveUntil = useRef(0)
 
   const isDirty = useMemo(() => {
     if (!draft || !baseline) return false
     return !draftsEqual(draft, baseline)
   }, [draft, baseline])
 
-  const showStatus = useCallback((message: string, kind: "success" | "error" | "info") => {
+  const isDirtyRef = useRef(false)
+  isDirtyRef.current = isDirty
+
+  const showStatus = useCallback((message: string, kind: "success" | "error") => {
     if (kind === "error") {
       setError(message)
       setSaved(null)
       return
     }
-    if (kind === "success") {
-      setSaved(message)
-      setError(null)
-      if (successTimer.current) clearTimeout(successTimer.current)
-      successTimer.current = setTimeout(() => setSaved(null), SUCCESS_DISMISS_MS)
-      return
-    }
-    setStatusHint(message)
+    setSaved(message)
+    setError(null)
+    if (successTimer.current) clearTimeout(successTimer.current)
+    successTimer.current = setTimeout(() => setSaved(null), SUCCESS_DISMISS_MS)
   }, [])
 
   const hydrate = useCallback((data: Profile) => {
@@ -107,14 +108,19 @@ export function ProfilePageClient() {
     setBaseline(next)
     setDraft(next)
     setFieldErrors({})
-    skipAutoSaveUntil.current = Date.now() + 500
   }, [])
 
   const reloadProfile = useCallback(async () => {
+    if (candidateSync) {
+      const overview = await candidateSync.refresh({ silent: true })
+      const data = overview?.profile ?? (await profileApi.me())
+      hydrate(data)
+      return data
+    }
     const data = await profileApi.me()
     hydrate(data)
     return data
-  }, [hydrate])
+  }, [hydrate, candidateSync])
 
   const syncAuthUser = useCallback(
     async (updated: Profile) => {
@@ -129,11 +135,27 @@ export function ProfilePageClient() {
         updated_at: updated.updated_at,
       })
       await refreshUser()
+      candidateSync?.setProfile(updated)
     },
-    [refreshUser]
+    [refreshUser, candidateSync]
   )
 
   useEffect(() => {
+    if (candidateSync) {
+      if (candidateSync.profile) {
+        if (!isDirtyRef.current) {
+          hydrate(candidateSync.profile)
+        }
+        setLoading(false)
+      } else if (candidateSync.loading) {
+        setLoading(true)
+      } else if (candidateSync.error) {
+        setError(candidateSync.error)
+        setLoading(false)
+      }
+      return
+    }
+
     let cancelled = false
     profileApi
       .me()
@@ -150,10 +172,15 @@ export function ProfilePageClient() {
       })
     return () => {
       cancelled = true
-      if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current)
       if (successTimer.current) clearTimeout(successTimer.current)
     }
-  }, [hydrate])
+  }, [
+    hydrate,
+    candidateSync,
+    candidateSync?.profile?.updated_at,
+    candidateSync?.loading,
+    candidateSync?.error,
+  ])
 
   useEffect(() => {
     if (!focusNameOnEdit || loading || !draft) return
@@ -175,99 +202,62 @@ export function ProfilePageClient() {
         return next
       })
       setError(null)
+      setSaved(null)
     },
     []
   )
 
-  const persist = useCallback(
-    async (opts?: { source?: "manual" | "auto" }) => {
-      if (!profile || !draft || saveLock.current) return false
-      const source = opts?.source ?? "manual"
-
-      const errors = validateDraft(draft, profile.role)
-      setFieldErrors(errors)
-      if (Object.keys(errors).length > 0) {
-        if (source === "manual") {
-          setError("Please fix the highlighted fields before saving.")
-        }
-        return false
-      }
-
-      saveLock.current = true
-      if (source === "auto") setAutoSaving(true)
-      else setSaving(true)
-      setError(null)
-      setStatusHint(source === "auto" ? "Auto-saving…" : null)
-
-      try {
-        const payload = buildUpdatePayload(draft, profile.role)
-        const updated = await profileApi.update(payload)
-        hydrate(updated)
-        await syncAuthUser(updated)
-        showStatus(
-          source === "auto" ? "Changes auto-saved." : "Profile saved successfully.",
-          "success"
-        )
-        setStatusHint(null)
-        return true
-      } catch (err) {
-        showStatus(
-          err instanceof ApiError
-            ? err.message
-            : err instanceof Error
-              ? err.message
-              : "Failed to save profile",
-          "error"
-        )
-        setStatusHint(null)
-        return false
-      } finally {
-        saveLock.current = false
-        setSaving(false)
-        setAutoSaving(false)
-      }
-    },
-    [profile, draft, hydrate, syncAuthUser, showStatus]
-  )
-
-  useEffect(() => {
-    if (!profile || !draft || !baseline) return
-    if (Date.now() < skipAutoSaveUntil.current) return
-    if (draftsEqual(draft, baseline)) {
-      setStatusHint(null)
-      return
-    }
+  const persist = useCallback(async () => {
+    if (!profile || !draft || saveLock.current) return false
 
     const errors = validateDraft(draft, profile.role)
+    setFieldErrors(errors)
     if (Object.keys(errors).length > 0) {
-      setStatusHint("Unsaved changes — fix validation to auto-save")
-      return
+      setError("Please fix the highlighted fields before saving.")
+      return false
     }
 
-    setStatusHint("Unsaved changes")
-    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current)
-    autoSaveTimer.current = setTimeout(() => {
-      void persist({ source: "auto" })
-    }, AUTO_SAVE_MS)
+    saveLock.current = true
+    setSaving(true)
+    setError(null)
 
-    return () => {
-      if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current)
+    try {
+      const payload = buildUpdatePayload(draft, profile.role)
+      const updated = await profileApi.update(payload)
+      hydrate(updated)
+      await syncAuthUser(updated)
+      if (candidateSync) {
+        await candidateSync.refresh({ silent: true })
+      }
+      showStatus("Profile saved successfully.", "success")
+      return true
+    } catch (err) {
+      showStatus(
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : "Failed to save profile",
+        "error"
+      )
+      return false
+    } finally {
+      saveLock.current = false
+      setSaving(false)
     }
-  }, [draft, baseline, profile, persist])
+  }, [profile, draft, hydrate, syncAuthUser, showStatus, candidateSync])
 
   async function onManualSave(event: React.FormEvent) {
     event.preventDefault()
-    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current)
-    await persist({ source: "manual" })
+    await persist()
   }
 
   function cancelChanges() {
     if (!baseline) return
-    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current)
     setDraft(baseline)
     setFieldErrors({})
     setError(null)
-    setStatusHint(null)
+    setSaved(null)
   }
 
   async function onAvatarChange(event: React.ChangeEvent<HTMLInputElement>) {
@@ -305,7 +295,6 @@ export function ProfilePageClient() {
   }
 
   const isCandidate = profile.role === "candidate"
-  const busy = saving || autoSaving
 
   return (
     <PageTransition>
@@ -314,29 +303,35 @@ export function ProfilePageClient() {
           title="Profile"
           description={
             isCandidate
-              ? "Personal information and your latest resume — changes auto-save when valid."
+              ? "Edit your details, then click Save to update the database."
               : profile.role === "recruiter"
                 ? "Keep your recruiter identity and company details up to date."
                 : "Manage your admin account details."
           }
           actions={
             <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-              {isDirty ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={busy}
-                  onClick={cancelChanges}
-                >
-                  Cancel changes
-                </Button>
-              ) : null}
+              <Button
+                type="button"
+                variant="outline"
+                disabled={saving || !isDirty}
+                onClick={cancelChanges}
+              >
+                Cancel
+              </Button>
               <Button
                 type="submit"
                 form="profile-form"
-                disabled={busy || !isDirty}
+                disabled={saving || !isDirty}
+                className="gap-1.5"
               >
-                {saving ? "Saving…" : "Save profile"}
+                {saving ? (
+                  <>
+                    <Loader2 className="size-3.5 animate-spin" />
+                    Saving…
+                  </>
+                ) : (
+                  "Save"
+                )}
               </Button>
             </div>
           }
@@ -350,13 +345,16 @@ export function ProfilePageClient() {
           </p>
         ) : null}
         {saved ? (
-          <p className="rounded-lg bg-emerald-500/10 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-300">
+          <p
+            role="status"
+            className="rounded-lg bg-emerald-500/10 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-300"
+          >
             {saved}
           </p>
         ) : null}
-        {!error && !saved && (statusHint || autoSaving) ? (
+        {!error && !saved && isDirty ? (
           <p className="rounded-lg border border-border/70 bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
-            {autoSaving ? "Auto-saving…" : statusHint}
+            You have unsaved changes.
           </p>
         ) : null}
       </div>
@@ -377,7 +375,7 @@ export function ProfilePageClient() {
                 <label
                   className={cn(
                     "absolute -right-1 -bottom-1 inline-flex size-8 cursor-pointer items-center justify-center rounded-full border border-border bg-background shadow-sm transition-colors hover:bg-muted",
-                    uploadingAvatar && "pointer-events-none opacity-60"
+                    (uploadingAvatar || saving) && "pointer-events-none opacity-60"
                   )}
                 >
                   <Camera className="size-3.5" />
@@ -385,7 +383,7 @@ export function ProfilePageClient() {
                     type="file"
                     accept="image/jpeg,image/png,image/webp,image/gif"
                     className="sr-only"
-                    disabled={uploadingAvatar}
+                    disabled={uploadingAvatar || saving}
                     onChange={(e) => void onAvatarChange(e)}
                   />
                 </label>
@@ -407,6 +405,12 @@ export function ProfilePageClient() {
 
         {isCandidate ? (
           <>
+            {candidateSync ? (
+              <FadeIn>
+                <CandidateLoginInfoSection />
+              </FadeIn>
+            ) : null}
+
             <FadeIn>
               <Card className="border-border/70 bg-card/80 shadow-none">
                 <CardHeader>
@@ -424,6 +428,7 @@ export function ProfilePageClient() {
                       <Input
                         id="full_name"
                         value={draft.fullName}
+                        disabled={saving}
                         onChange={(e) => patchDraft("fullName", e.target.value)}
                         required
                         aria-invalid={Boolean(fieldErrors.fullName)}
@@ -436,6 +441,7 @@ export function ProfilePageClient() {
                         id="email"
                         type="email"
                         value={draft.email}
+                        disabled={saving}
                         onChange={(e) => patchDraft("email", e.target.value)}
                         required
                         aria-invalid={Boolean(fieldErrors.email)}
@@ -447,6 +453,7 @@ export function ProfilePageClient() {
                       <Input
                         id="phone"
                         value={draft.phone}
+                        disabled={saving}
                         onChange={(e) => patchDraft("phone", e.target.value)}
                         placeholder="+91 98765 43210"
                         aria-invalid={Boolean(fieldErrors.phone)}
@@ -459,6 +466,7 @@ export function ProfilePageClient() {
                         id="linkedin"
                         type="url"
                         value={draft.linkedin}
+                        disabled={saving}
                         onChange={(e) => patchDraft("linkedin", e.target.value)}
                         placeholder="https://linkedin.com/in/…"
                         aria-invalid={Boolean(fieldErrors.linkedin)}
@@ -471,6 +479,7 @@ export function ProfilePageClient() {
                         id="github"
                         type="url"
                         value={draft.github}
+                        disabled={saving}
                         onChange={(e) => patchDraft("github", e.target.value)}
                         placeholder="https://github.com/…"
                         aria-invalid={Boolean(fieldErrors.github)}
@@ -486,7 +495,7 @@ export function ProfilePageClient() {
                       onChange={(next) => patchDraft("location", next)}
                     />
                     <p className="text-xs text-muted-foreground">
-                      Select state/UT first, then city. Saved with your profile.
+                      Select state/UT first, then city. Saved when you click Save.
                     </p>
                   </div>
                 </CardContent>
@@ -495,51 +504,41 @@ export function ProfilePageClient() {
 
             <FadeIn>
               <AboutMeSection
-                profile={profile}
-                onMessage={(message, kind) => showStatus(message, kind)}
-                onSaved={async (updated) => {
-                  hydrate(updated)
-                  await syncAuthUser(updated)
-                }}
+                value={draft.summary}
+                disabled={saving}
+                onChange={(value) => patchDraft("summary", value)}
               />
             </FadeIn>
 
             <FadeIn>
               <SkillsSection
-                profile={profile}
-                onMessage={(message, kind) => showStatus(message, kind)}
-                onSaved={async (updated) => {
-                  hydrate(updated)
-                  await syncAuthUser(updated)
-                }}
+                value={draft.skills}
+                disabled={saving}
+                onChange={(skills) => patchDraft("skills", skills)}
               />
             </FadeIn>
 
             <FadeIn>
               <EducationSection
-                profile={profile}
-                onMessage={(message, kind) => showStatus(message, kind)}
-                onSaved={async (updated) => {
-                  hydrate(updated)
-                  await syncAuthUser(updated)
-                }}
+                value={draft.education}
+                disabled={saving}
+                onChange={(education) => patchDraft("education", education)}
               />
             </FadeIn>
 
             <FadeIn>
               <ExperienceSection
-                profile={profile}
-                onMessage={(message, kind) => showStatus(message, kind)}
-                onSaved={async (updated) => {
-                  hydrate(updated)
-                  await syncAuthUser(updated)
-                }}
+                value={draft.experience}
+                disabled={saving}
+                onChange={(experience) => patchDraft("experience", experience)}
               />
             </FadeIn>
 
             <FadeIn>
               <LatestResumePanel
                 mode="candidate"
+                title="Resume / CV"
+                description={`Upload PDF, DOC, DOCX, TXT, or RTF (max ${RESUME_MAX_SIZE_MB}MB). Upload stores the file only — your name, phone, skills, and other profile fields are never overwritten. AI parsing runs only during Resume Screening.`}
                 resume={{
                   id: profile.resume_id,
                   fileName: profile.resume_file_name,
@@ -553,6 +552,12 @@ export function ProfilePageClient() {
                 }}
               />
             </FadeIn>
+
+            {candidateSync ? (
+              <FadeIn>
+                <CandidateActivitySections />
+              </FadeIn>
+            ) : null}
           </>
         ) : (
           <div className="grid gap-4 lg:grid-cols-2">
@@ -569,6 +574,7 @@ export function ProfilePageClient() {
                     <Input
                       id="full_name"
                       value={draft.fullName}
+                      disabled={saving}
                       onChange={(e) => patchDraft("fullName", e.target.value)}
                       required
                       aria-invalid={Boolean(fieldErrors.fullName)}
@@ -581,6 +587,7 @@ export function ProfilePageClient() {
                       id="email"
                       type="email"
                       value={draft.email}
+                      disabled={saving}
                       onChange={(e) => patchDraft("email", e.target.value)}
                       required
                       aria-invalid={Boolean(fieldErrors.email)}
@@ -593,6 +600,7 @@ export function ProfilePageClient() {
                       <Input
                         id="phone"
                         value={draft.phone}
+                        disabled={saving}
                         onChange={(e) => patchDraft("phone", e.target.value)}
                         placeholder="+91 98765 43210"
                         aria-invalid={Boolean(fieldErrors.phone)}
@@ -618,6 +626,7 @@ export function ProfilePageClient() {
                       <Input
                         id="company"
                         value={draft.companyName}
+                        disabled={saving}
                         onChange={(e) => patchDraft("companyName", e.target.value)}
                       />
                     </div>
@@ -626,6 +635,7 @@ export function ProfilePageClient() {
                       <Input
                         id="position"
                         value={draft.jobTitle}
+                        disabled={saving}
                         onChange={(e) => patchDraft("jobTitle", e.target.value)}
                       />
                     </div>
@@ -635,23 +645,6 @@ export function ProfilePageClient() {
             ) : null}
           </div>
         )}
-
-        <div className="flex flex-wrap gap-2">
-          <Button type="submit" disabled={busy || !isDirty}>
-            {saving ? "Saving…" : "Save profile"}
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            disabled={busy || !isDirty}
-            onClick={cancelChanges}
-          >
-            Cancel changes
-          </Button>
-          <span className="self-center text-xs text-muted-foreground">
-            {isDirty ? "You have unsaved changes" : "All changes saved"}
-          </span>
-        </div>
       </form>
     </PageTransition>
   )

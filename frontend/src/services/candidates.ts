@@ -7,6 +7,7 @@ import type {
   CandidateProfile,
   CandidateUpdatePayload,
 } from "@/types/candidate"
+import type { CandidateOverview } from "@/types/candidate-sync"
 
 function toQuery(params: CandidateListParams = {}) {
   const query: Record<string, string | number | boolean> = {}
@@ -51,6 +52,10 @@ export const candidatesApi = {
 
   myProfile() {
     return apiClient.get<CandidateProfile>("/candidates/me/profile")
+  },
+
+  overview() {
+    return apiClient.get<CandidateOverview>("/candidates/me/overview")
   },
 
   updateMe(payload: CandidateUpdatePayload) {

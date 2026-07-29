@@ -5,6 +5,7 @@ import { AppSidebar } from "@/components/layout/app-sidebar"
 import { AuthLoading } from "@/components/shared/auth-loading"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { useAuth } from "@/features/auth/auth-provider"
+import { CandidateSyncProvider } from "@/features/candidate/candidate-sync-provider"
 
 export default function PortalLayout({
   children,
@@ -18,12 +19,14 @@ export default function PortalLayout({
   }
 
   return (
-    <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset className="min-h-svh">
-        <AppNavbar />
-        <div className="flex-1 px-4 py-5 sm:py-6 md:px-6 lg:px-8">{children}</div>
-      </SidebarInset>
-    </SidebarProvider>
+    <CandidateSyncProvider>
+      <SidebarProvider>
+        <AppSidebar />
+        <SidebarInset className="min-h-svh">
+          <AppNavbar />
+          <div className="flex-1 px-4 py-5 sm:py-6 md:px-6 lg:px-8">{children}</div>
+        </SidebarInset>
+      </SidebarProvider>
+    </CandidateSyncProvider>
   )
 }

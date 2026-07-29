@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { Pencil, Plus, Trash2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -13,57 +13,32 @@ import {
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { emptyExperience } from "@/features/profile/profile-form"
-import { profileApi } from "@/services/profile"
-import { ApiError } from "@/types/api"
 import type { ExperienceItem } from "@/types/candidate"
-import type { Profile } from "@/types/profile"
 
 type ExperienceSectionProps = {
-  profile: Profile
-  onSaved: (updated: Profile) => void | Promise<void>
-  onMessage: (message: string, kind: "success" | "error") => void
-}
-
-function cloneExperience(items: ExperienceItem[]): ExperienceItem[] {
-  return items.map((item) => ({
-    company: item.company ?? "",
-    title: item.title ?? "",
-    start_date: item.start_date ?? "",
-    end_date: item.end_date ?? "",
-    description: item.description ?? "",
-  }))
+  value: ExperienceItem[]
+  disabled?: boolean
+  onChange: (items: ExperienceItem[]) => void
 }
 
 export function ExperienceSection({
-  profile,
-  onSaved,
-  onMessage,
+  value,
+  disabled = false,
+  onChange,
 }: ExperienceSectionProps) {
-  const [items, setItems] = useState<ExperienceItem[]>(() =>
-    cloneExperience(profile.experience ?? [])
-  )
   const [editingIndex, setEditingIndex] = useState<number | null>(null)
-  const [saving, setSaving] = useState(false)
-  const dirty =
-    JSON.stringify(items) !==
-    JSON.stringify(cloneExperience(profile.experience ?? []))
-
-  useEffect(() => {
-    setItems(cloneExperience(profile.experience ?? []))
-    setEditingIndex(null)
-  }, [profile.experience])
 
   function updateRow(index: number, next: ExperienceItem) {
-    setItems((prev) => prev.map((row, i) => (i === index ? next : row)))
+    onChange(value.map((row, i) => (i === index ? next : row)))
   }
 
   function addRow() {
-    setItems((prev) => [...prev, emptyExperience()])
-    setEditingIndex(items.length)
+    onChange([...value, emptyExperience()])
+    setEditingIndex(value.length)
   }
 
   function removeRow(index: number) {
-    setItems((prev) => prev.filter((_, i) => i !== index))
+    onChange(value.filter((_, i) => i !== index))
     setEditingIndex((current) => {
       if (current == null) return null
       if (current === index) return null
@@ -72,53 +47,32 @@ export function ExperienceSection({
     })
   }
 
-  function cancel() {
-    setItems(cloneExperience(profile.experience ?? []))
-    setEditingIndex(null)
-  }
-
-  async function save() {
-    setSaving(true)
-    try {
-      const cleaned = items.map((item) => ({
-        company: (item.company || "").trim() || null,
-        title: (item.title || "").trim() || null,
-        start_date: (item.start_date || "").trim() || null,
-        end_date: (item.end_date || "").trim() || null,
-        description: (item.description || "").trim() || null,
-      }))
-      const updated = await profileApi.update({ experience: cleaned })
-      await onSaved(updated)
-      setEditingIndex(null)
-      onMessage("Experience saved.", "success")
-    } catch (err) {
-      onMessage(
-        err instanceof ApiError ? err.message : "Failed to save experience",
-        "error"
-      )
-    } finally {
-      setSaving(false)
-    }
-  }
-
   return (
     <Card className="border-border/70 bg-card/80 shadow-none">
       <CardHeader className="flex flex-row items-start justify-between gap-3">
         <div>
           <CardTitle className="font-heading text-base">Experience</CardTitle>
-          <CardDescription>Add, edit, and save your work history</CardDescription>
+          <CardDescription>
+            Add and edit work history. Saved with the profile Save button.
+          </CardDescription>
         </div>
-        <Button type="button" size="sm" variant="outline" onClick={addRow}>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          disabled={disabled}
+          onClick={addRow}
+        >
           <Plus className="size-3.5" />
           Add
         </Button>
       </CardHeader>
       <CardContent className="space-y-4">
-        {items.length === 0 ? (
+        {value.length === 0 ? (
           <p className="text-sm text-muted-foreground">No experience added.</p>
         ) : null}
 
-        {items.map((item, index) => {
+        {value.map((item, index) => {
           const isEditing = editingIndex === index
           return (
             <div
@@ -130,6 +84,7 @@ export function ExperienceSection({
                   <Input
                     placeholder="Company"
                     value={item.company ?? ""}
+                    disabled={disabled}
                     onChange={(e) =>
                       updateRow(index, { ...item, company: e.target.value })
                     }
@@ -137,6 +92,7 @@ export function ExperienceSection({
                   <Input
                     placeholder="Title"
                     value={item.title ?? ""}
+                    disabled={disabled}
                     onChange={(e) =>
                       updateRow(index, { ...item, title: e.target.value })
                     }
@@ -144,6 +100,7 @@ export function ExperienceSection({
                   <Input
                     placeholder="Start"
                     value={item.start_date ?? ""}
+                    disabled={disabled}
                     onChange={(e) =>
                       updateRow(index, { ...item, start_date: e.target.value })
                     }
@@ -151,6 +108,7 @@ export function ExperienceSection({
                   <Input
                     placeholder="End"
                     value={item.end_date ?? ""}
+                    disabled={disabled}
                     onChange={(e) =>
                       updateRow(index, { ...item, end_date: e.target.value })
                     }
@@ -159,7 +117,8 @@ export function ExperienceSection({
                     placeholder="Description"
                     value={item.description ?? ""}
                     rows={3}
-                    className="col-span-full flex w-full rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm outline-none transition-colors hover:border-ring/40 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
+                    disabled={disabled}
+                    className="col-span-full flex w-full rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm outline-none transition-colors hover:border-ring/40 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-input/30"
                     onChange={(e) =>
                       updateRow(index, { ...item, description: e.target.value })
                     }
@@ -186,6 +145,7 @@ export function ExperienceSection({
                   type="button"
                   size="sm"
                   variant="outline"
+                  disabled={disabled}
                   onClick={() => setEditingIndex(isEditing ? null : index)}
                 >
                   <Pencil className="size-3.5" />
@@ -195,6 +155,7 @@ export function ExperienceSection({
                   type="button"
                   size="sm"
                   variant="outline"
+                  disabled={disabled}
                   onClick={() => removeRow(index)}
                 >
                   <Trash2 className="size-3.5" />
@@ -204,20 +165,6 @@ export function ExperienceSection({
             </div>
           )
         })}
-
-        <div className="flex flex-wrap gap-2 border-t border-border/60 pt-3">
-          <Button type="button" disabled={saving || !dirty} onClick={() => void save()}>
-            {saving ? "Saving…" : "Save"}
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            disabled={saving || !dirty}
-            onClick={cancel}
-          >
-            Cancel
-          </Button>
-        </div>
       </CardContent>
     </Card>
   )

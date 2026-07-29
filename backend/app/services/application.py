@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import uuid
 from datetime import UTC, datetime
@@ -9,7 +10,6 @@ from datetime import UTC, datetime
 from sqlalchemy.orm import Session
 
 from app.ai.job_matcher import compare_resume_to_job
-from app.core.config import settings
 from app.core.exceptions import AppException, ConflictError, NotFoundError
 from app.crud.application import application as application_crud
 from app.crud.job import job as job_crud
@@ -35,6 +35,17 @@ def _as_str_list(value: object) -> list[str]:
     return [str(s).strip() for s in value if str(s).strip()]
 
 
+def _score_fingerprint(*, resume, job) -> str:
+    resume_stamp = getattr(resume, "updated_at", None) or getattr(resume, "created_at", None)
+    job_stamp = getattr(job, "updated_at", None) or getattr(job, "created_at", None)
+    payload = (
+        f"{resume.id}|{resume_stamp.isoformat() if resume_stamp else ''}|"
+        f"{job.id}|{job_stamp.isoformat() if job_stamp else ''}|"
+        f"{(job.description or '')[:2000]}"
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
 def _to_response(obj: Application) -> ApplicationResponse:
     candidate_name = None
     candidate_email = None
@@ -45,6 +56,7 @@ def _to_response(obj: Application) -> ApplicationResponse:
     job_title = obj.job.title if obj.job else None
     company_name = obj.job.company.name if obj.job and obj.job.company else None
     resume_file_name = obj.resume.file_name if obj.resume else None
+    engine = obj.scoring_engine if obj.scoring_engine in {"openai", "local"} else None
 
     return ApplicationResponse(
         id=obj.id,
@@ -66,6 +78,8 @@ def _to_response(obj: Application) -> ApplicationResponse:
         suggestions=_as_str_list(obj.suggestions),
         summary=obj.ai_summary,
         reasoning=obj.reasoning,
+        scoring_engine=engine,  # type: ignore[arg-type]
+        confidence=float(obj.confidence) if obj.confidence is not None else None,
         created_at=obj.created_at,
         updated_at=obj.updated_at,
     )
@@ -94,6 +108,7 @@ class ApplicationService:
             raise NotFoundError("Resume not found")
 
         # Auto re-extract / re-parse failed uploads before matching.
+        # Cached parsed_data is reused when the resume is already PARSED.
         resume = resume_service.ensure_ready(db, resume_id=resume.id)
 
         if (
@@ -108,17 +123,28 @@ class ApplicationService:
                 code="resume_not_ready",
             )
 
+        fingerprint = _score_fingerprint(resume=resume, job=job)
+        existing = application_crud.get_by_job_candidate(
+            db,
+            job_id=job.id,
+            candidate_id=resume.candidate_id,
+        )
+
+        # Skip re-scoring when resume + job inputs have not changed
+        if (
+            existing is not None
+            and existing.match_score is not None
+            and existing.score_fingerprint == fingerprint
+            and existing.resume_id == resume.id
+        ):
+            return _to_response(existing)
+
         match = compare_resume_to_job(
             job_title=job.title,
             job_description=job.description,
             resume_payload=_resume_payload(resume),
         )
 
-        existing = application_crud.get_by_job_candidate(
-            db,
-            job_id=job.id,
-            candidate_id=resume.candidate_id,
-        )
         is_new = existing is None
         if existing is None:
             existing = application_crud.create(
@@ -135,6 +161,7 @@ class ApplicationService:
             resume_id=resume.id,
             match=match,
             status=ApplicationStatus.SCREENING if not is_new else ApplicationStatus.APPLIED,
+            score_fingerprint=fingerprint,
         )
 
         if is_new and saved:
@@ -208,14 +235,11 @@ class ApplicationService:
                 code="resume_required",
             )
 
-        # Prefer AI screening when OpenAI + parsed resume are available
+        # Prefer screening when resume text/parsed data is available (AI or local engine)
         can_match = bool(
-            settings.OPENAI_API_KEY
-            and (
-                resume.status == ResumeStatus.PARSED
-                or resume.parsed_data
-                or resume.raw_text
-            )
+            resume.status == ResumeStatus.PARSED
+            or resume.parsed_data
+            or resume.raw_text
         )
         if can_match:
             try:
@@ -336,6 +360,8 @@ class ApplicationService:
 ## Scores
 | Metric | Score |
 |---|---|
+| Scoring engine | {"AI Score" if data.scoring_engine == "openai" else "Local Analysis" if data.scoring_engine == "local" else "—"} |
+| Confidence | {data.confidence if data.confidence is not None else "—"} / 100 |
 | Job match score | {data.match_score if data.match_score is not None else "—"} / 100 |
 | ATS score | {data.ats_score if data.ats_score is not None else "—"} / 100 |
 

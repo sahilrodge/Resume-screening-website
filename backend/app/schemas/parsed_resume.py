@@ -35,3 +35,4 @@ class ParsedResumeData(BaseModel):
     experience: list[ExperienceItem] = Field(default_factory=list)
     skills: list[str] = Field(default_factory=list)
     projects: list[ProjectItem] = Field(default_factory=list)
+    certifications: list[str] = Field(default_factory=list)
