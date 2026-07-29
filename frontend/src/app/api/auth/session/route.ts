@@ -9,10 +9,25 @@ import {
 import type { UserRole } from "@/types/auth"
 
 function getApiBase() {
-  return (
-    process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ||
-    "http://127.0.0.1:8000/api/v1"
-  )
+  // Server-side fetch needs an absolute URL. Relative `/api/v1` works in the
+  // browser (Vercel rewrite) but breaks Node fetch during session bootstrap.
+  const configured = process.env.NEXT_PUBLIC_API_URL?.trim().replace(/\/$/, "")
+  if (configured && /^https?:\/\//i.test(configured)) {
+    return configured.endsWith("/api/v1") ? configured : `${configured}/api/v1`
+  }
+
+  const proxyTarget = process.env.API_PROXY_TARGET?.trim().replace(/\/$/, "")
+  if (proxyTarget) {
+    return proxyTarget.endsWith("/api/v1")
+      ? proxyTarget
+      : `${proxyTarget}/api/v1`
+  }
+
+  if (process.env.VERCEL === "1" || process.env.NODE_ENV === "production") {
+    return "https://api-production-5f0fb.up.railway.app/api/v1"
+  }
+
+  return "http://127.0.0.1:8000/api/v1"
 }
 
 function isSecureRequest(request: NextRequest) {

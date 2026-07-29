@@ -10,6 +10,15 @@ import {
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
+
+  // Proxy + auth API must pass through without session redirects
+  if (
+    pathname.startsWith("/api/v1") ||
+    pathname.startsWith("/api/auth/")
+  ) {
+    return NextResponse.next()
+  }
+
   const secret = process.env.AUTH_SECRET
   const session = await verifySessionCookie(
     request.cookies.get(SESSION_COOKIE)?.value,
@@ -30,11 +39,6 @@ export async function middleware(request: NextRequest) {
   }
 
   if (isPublicPath(pathname)) {
-    return NextResponse.next()
-  }
-
-  // Allow session API routes without an existing cookie
-  if (pathname.startsWith("/api/auth/session")) {
     return NextResponse.next()
   }
 

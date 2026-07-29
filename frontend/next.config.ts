@@ -1,5 +1,10 @@
 import type { NextConfig } from "next"
 
+const API_PROXY_TARGET = (
+  process.env.API_PROXY_TARGET ||
+  "https://api-production-5f0fb.up.railway.app"
+).replace(/\/$/, "")
+
 const nextConfig: NextConfig = {
   // Smaller Docker/Railway images; required by frontend/Dockerfile
   output: "standalone",
@@ -36,6 +41,16 @@ const nextConfig: NextConfig = {
   },
   typescript: {
     ignoreBuildErrors: false,
+  },
+
+  // Same-origin browser → Vercel → Railway (avoids cross-origin failures)
+  async rewrites() {
+    return [
+      {
+        source: "/api/v1/:path*",
+        destination: `${API_PROXY_TARGET}/api/v1/:path*`,
+      },
+    ]
   },
 
   async headers() {

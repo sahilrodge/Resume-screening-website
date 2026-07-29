@@ -102,6 +102,14 @@ def ensure_super_admin(db: Session) -> User | None:
         if full_name and not (user.full_name or "").strip():
             user.full_name = full_name
             changed = True
+        # Keep production login in sync when SUPER_ADMIN_PASSWORD is configured
+        if password:
+            from app.core.security import hash_password, verify_password
+
+            if not verify_password(password, user.hashed_password):
+                user.hashed_password = hash_password(password)
+                changed = True
+                logger.info("Synced Super Admin password from SUPER_ADMIN_PASSWORD")
         if changed:
             db.add(user)
             db.commit()

@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Query, status
-from pydantic import BaseModel, ConfigDict, EmailStr
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import joinedload
 
@@ -33,7 +33,8 @@ class AdminUserResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
-    email: EmailStr
+    # Plain str: seed accounts may use reserved domains like *.local that EmailStr rejects
+    email: str
     full_name: str
     role: UserRole
     is_active: bool
