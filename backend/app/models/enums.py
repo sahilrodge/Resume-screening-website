@@ -37,10 +37,12 @@ class ApplicationStatus(str, Enum):
 
 class InterviewStatus(str, Enum):
     SCHEDULED = "scheduled"
-    COMPLETED = "completed"
-    CANCELLED = "cancelled"
-    NO_SHOW = "no_show"
     RESCHEDULED = "rescheduled"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+    SELECTED = "selected"
+    REJECTED = "rejected"
+    CANCELLED = "cancelled"
 
 
 class InterviewType(str, Enum):

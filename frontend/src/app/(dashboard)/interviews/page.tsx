@@ -8,7 +8,7 @@ import { StatusBadge } from "@/components/admin/status-badge"
 import { FadeIn, PageTransition } from "@/components/motion/page-transition"
 import { EmptyState } from "@/components/shared/empty-state"
 import { PageHeader } from "@/components/shared/page-header"
-import { Button, buttonVariants } from "@/components/ui/button"
+import { buttonVariants } from "@/components/ui/button"
 import {
   Card,
   CardContent,
@@ -16,7 +16,20 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { interviewsApi, type Interview } from "@/services/interviews"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
+  INTERVIEW_STATUS_LABELS,
+  INTERVIEW_STATUSES,
+  interviewsApi,
+  type Interview,
+  type InterviewStatus,
+} from "@/services/interviews"
 import { ApiError } from "@/types/api"
 
 function formatWhen(iso: string) {
@@ -29,6 +42,11 @@ function formatWhen(iso: string) {
     return iso
   }
 }
+
+const statusSelectItems = INTERVIEW_STATUSES.map((status) => ({
+  value: status,
+  label: INTERVIEW_STATUS_LABELS[status],
+}))
 
 export default function InterviewsPage() {
   const [items, setItems] = useState<Interview[]>([])
@@ -62,13 +80,28 @@ export default function InterviewsPage() {
     }
   }, [])
 
-  async function setStatus(id: string, status: Interview["status"]) {
+  async function setStatus(id: string, status: InterviewStatus) {
+    const previous = items.find((item) => item.id === id)?.status
+    if (!previous || previous === status) return
+
+    // Optimistic UI — persist immediately
     setBusyId(id)
     setError(null)
+    setItems((current) =>
+      current.map((item) => (item.id === id ? { ...item, status } : item))
+    )
+
     try {
-      await interviewsApi.updateStatus(id, { status })
-      await load()
+      const updated = await interviewsApi.updateStatus(id, { status })
+      setItems((current) =>
+        current.map((item) => (item.id === id ? { ...item, ...updated } : item))
+      )
     } catch (err) {
+      setItems((current) =>
+        current.map((item) =>
+          item.id === id ? { ...item, status: previous } : item
+        )
+      )
       setError(err instanceof ApiError ? err.message : "Could not update interview")
     } finally {
       setBusyId(null)
@@ -80,7 +113,7 @@ export default function InterviewsPage() {
       <FadeIn>
         <PageHeader
           title="Interviews"
-          description="Schedule voice, video, and onsite interviews."
+          description="Track and update interview status for every candidate."
           actions={
             <Link href="/screening" className={buttonVariants()}>
               <CalendarPlus data-icon="inline-start" />
@@ -120,42 +153,66 @@ export default function InterviewsPage() {
                     {item.company_name ? ` · ${item.company_name}` : ""}
                   </CardDescription>
                 </div>
-                <div className="flex flex-wrap gap-1.5">
+                <div className="flex flex-wrap items-center gap-1.5">
                   <StatusBadge status={item.interview_type} />
                   <StatusBadge status={item.status} />
                 </div>
               </CardHeader>
-              <CardContent className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
-                <span>{formatWhen(item.scheduled_at)}</span>
-                <span>{item.duration_minutes} min</span>
-                {item.application_id ? (
-                  <Link
-                    href={`/screening/${item.application_id}`}
-                    className="text-primary hover:underline"
+              <CardContent className="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <span>{formatWhen(item.scheduled_at)}</span>
+                  <span>{item.duration_minutes} min</span>
+                  {item.application_id ? (
+                    <Link
+                      href={`/screening/${item.application_id}`}
+                      className="text-primary hover:underline"
+                    >
+                      View application
+                    </Link>
+                  ) : null}
+                </div>
+
+                <div className="flex min-w-[11rem] flex-col gap-1">
+                  <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                    Status
+                  </span>
+                  <Select
+                    value={item.status}
+                    onValueChange={(value) => {
+                      if (typeof value === "string" && value) {
+                        void setStatus(item.id, value as InterviewStatus)
+                      }
+                    }}
+                    disabled={busyId === item.id}
+                    items={statusSelectItems}
                   >
-                    View application
-                  </Link>
-                ) : null}
-                {item.status === "scheduled" || item.status === "rescheduled" ? (
-                  <div className="flex gap-2">
-                    <Button
+                    <SelectTrigger
                       size="sm"
-                      variant="outline"
-                      disabled={busyId === item.id}
-                      onClick={() => void setStatus(item.id, "completed")}
+                      className="w-[11.5rem]"
+                      aria-label="Interview status"
                     >
-                      Complete
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={busyId === item.id}
-                      onClick={() => void setStatus(item.id, "cancelled")}
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                ) : null}
+                      <SelectValue>
+                        {(value) =>
+                          value
+                            ? INTERVIEW_STATUS_LABELS[value as InterviewStatus] ??
+                              String(value)
+                            : "Select status"
+                        }
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {INTERVIEW_STATUSES.map((status) => (
+                        <SelectItem
+                          key={status}
+                          value={status}
+                          label={INTERVIEW_STATUS_LABELS[status]}
+                        >
+                          {INTERVIEW_STATUS_LABELS[status]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </CardContent>
             </Card>
           </FadeIn>

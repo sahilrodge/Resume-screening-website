@@ -14,6 +14,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { buttonVariants } from "@/components/ui/button"
+import { StatusBadge } from "@/components/admin/status-badge"
 import {
   Card,
   CardContent,
@@ -422,9 +423,10 @@ export default function PortalHomePage() {
               <>
                 <div className="flex flex-wrap gap-2">
                   {Object.entries(interviewBreakdown).map(([status, count]) => (
-                    <Badge key={status} variant="secondary" className="capitalize">
-                      {status.replaceAll("_", " ")} · {count}
-                    </Badge>
+                    <div key={status} className="flex items-center gap-1.5">
+                      <StatusBadge status={status} />
+                      <span className="text-xs text-muted-foreground">{count}</span>
+                    </div>
                   ))}
                 </div>
                 <ul className="divide-y divide-border rounded-lg border border-border/60">
@@ -441,9 +443,7 @@ export default function PortalHomePage() {
                           {item.company_name ?? "Company"} · {formatWhen(item.scheduled_at)}
                         </p>
                       </div>
-                      <span className="shrink-0 text-[11px] capitalize text-muted-foreground">
-                        {item.status.replaceAll("_", " ")}
-                      </span>
+                      <StatusBadge status={item.status} />
                     </li>
                   ))}
                 </ul>

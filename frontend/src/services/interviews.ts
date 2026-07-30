@@ -1,5 +1,27 @@
 import { apiClient } from "@/lib/api"
 
+export const INTERVIEW_STATUSES = [
+  "scheduled",
+  "rescheduled",
+  "in_progress",
+  "completed",
+  "selected",
+  "rejected",
+  "cancelled",
+] as const
+
+export type InterviewStatus = (typeof INTERVIEW_STATUSES)[number]
+
+export const INTERVIEW_STATUS_LABELS: Record<InterviewStatus, string> = {
+  scheduled: "Scheduled",
+  rescheduled: "Rescheduled",
+  in_progress: "In Progress",
+  completed: "Completed",
+  selected: "Selected",
+  rejected: "Rejected",
+  cancelled: "Cancelled",
+}
+
 export type Interview = {
   id: string
   application_id: string
@@ -9,7 +31,7 @@ export type Interview = {
   company_name: string | null
   interviewer_id: string | null
   interview_type: "phone" | "video" | "onsite"
-  status: "scheduled" | "completed" | "cancelled" | "no_show" | "rescheduled"
+  status: InterviewStatus
   scheduled_at: string
   duration_minutes: number
   meeting_link: string | null
@@ -48,7 +70,7 @@ export const interviewsApi = {
     return apiClient.get<Interview>(`/interviews/${id}`)
   },
 
-  updateStatus(id: string, payload: { status: Interview["status"] }) {
+  updateStatus(id: string, payload: { status: InterviewStatus }) {
     return apiClient.patch<Interview>(`/interviews/${id}/status`, payload)
   },
 }

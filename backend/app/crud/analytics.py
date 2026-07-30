@@ -42,10 +42,12 @@ STATUS_LABELS = {
 
 INTERVIEW_STATUS_LABELS = {
     InterviewStatus.SCHEDULED: "Scheduled",
-    InterviewStatus.COMPLETED: "Completed",
-    InterviewStatus.CANCELLED: "Cancelled",
-    InterviewStatus.NO_SHOW: "No show",
     InterviewStatus.RESCHEDULED: "Rescheduled",
+    InterviewStatus.IN_PROGRESS: "In Progress",
+    InterviewStatus.COMPLETED: "Completed",
+    InterviewStatus.SELECTED: "Selected",
+    InterviewStatus.REJECTED: "Rejected",
+    InterviewStatus.CANCELLED: "Cancelled",
 }
 
 INTERVIEW_TYPE_LABELS = {

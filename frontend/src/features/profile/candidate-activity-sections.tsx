@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 
+import { StatusBadge } from "@/components/admin/status-badge"
 import { buttonVariants } from "@/components/ui/button"
 import {
   Card,
@@ -252,9 +253,7 @@ export function CandidateActivitySections() {
                       {item.interview_type.replaceAll("_", " ")}
                     </p>
                   </div>
-                  <span className="text-xs capitalize text-muted-foreground">
-                    {item.status.replaceAll("_", " ")}
-                  </span>
+                  <StatusBadge status={item.status} />
                 </li>
               ))}
             </ul>
