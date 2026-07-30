@@ -61,9 +61,9 @@ export default function ScreeningDetailPage() {
     try {
       const [data] = await Promise.all([
         applicationsApi.get(id),
-        loadInterviews().catch(() => {
-          setInterviews([])
-        }),
+        // Soft-fail interviews so a list error does not wipe cards that
+        // already show the status dropdown after scheduling.
+        loadInterviews().catch(() => undefined),
       ])
       setResult(data)
     } catch (err) {
@@ -194,8 +194,8 @@ export default function ScreeningDetailPage() {
                 <div>
                   <h3 className="font-heading text-sm font-semibold">Interview</h3>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Schedule an interview, then update status from the dropdown
-                    below. Changes save immediately.
+                    Schedule an interview, then set Interview Status from the
+                    dropdown on each interview card. Changes save immediately.
                   </p>
                 </div>
 
@@ -256,12 +256,10 @@ export default function ScreeningDetailPage() {
                               {item.meeting_link ? " · meeting link set" : ""}
                             </p>
                           </div>
-                          <StatusBadge status={item.status} />
                         </div>
 
                         <InterviewStatusSelect
                           interview={item}
-                          showBadge={false}
                           onUpdated={(updated) => {
                             setInterviews((current) =>
                               current.map((row) =>
@@ -270,6 +268,12 @@ export default function ScreeningDetailPage() {
                                   : row
                               )
                             )
+                            // Selected/Rejected (and other syncs) update the
+                            // application row — refresh so badges stay in sync.
+                            void applicationsApi
+                              .get(id)
+                              .then(setResult)
+                              .catch(() => undefined)
                           }}
                         />
 

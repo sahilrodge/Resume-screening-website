@@ -173,7 +173,7 @@ export default function InterviewsPage() {
       <div className="space-y-4">
         {items.map((item) => (
           <FadeIn key={item.id}>
-            <Card className="border-border/70 bg-card/80 shadow-none">
+            <Card className="overflow-visible border-border/70 bg-card/80 shadow-none">
               <CardHeader className="flex flex-col gap-3 space-y-0 pb-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0 space-y-1">
                   <CardTitle className="font-heading text-base">
@@ -210,7 +210,6 @@ export default function InterviewsPage() {
               <CardContent className="space-y-4">
                 <InterviewStatusSelect
                   interview={item}
-                  showBadge={false}
                   onUpdated={(updated) => {
                     setItems((current) =>
                       current.map((row) =>

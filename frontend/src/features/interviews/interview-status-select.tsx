@@ -6,13 +6,6 @@ import { StatusBadge } from "@/components/admin/status-badge"
 import { useToast } from "@/components/shared/toast"
 import { Label } from "@/components/ui/label"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
   INTERVIEW_STATUS_LABELS,
   INTERVIEW_STATUSES,
   interviewsApi,
@@ -27,14 +20,21 @@ type InterviewStatusSelectProps = {
   onUpdated?: (next: Interview) => void
   className?: string
   showBadge?: boolean
+  /** When false, renders read-only badge (candidates). Default: editable. */
+  editable?: boolean
 }
 
-/** Recruiter/admin status control — persists via PATCH /interviews/{id}/status. */
+/**
+ * Interview status control — persists via PATCH /interviews/{id}/status.
+ * Uses a native <select> so the control is always visible (Base UI Select
+ * portals were easy to miss / fail inside transformed cards after scheduling).
+ */
 export function InterviewStatusSelect({
   interview,
   onUpdated,
   className,
   showBadge = true,
+  editable = true,
 }: InterviewStatusSelectProps) {
   const { toast } = useToast()
   const fieldId = useId()
@@ -71,36 +71,39 @@ export function InterviewStatusSelect({
     }
   }
 
+  if (!editable) {
+    return (
+      <div className={cn("flex flex-wrap items-center gap-2", className)}>
+        <span className="text-sm font-medium text-foreground">
+          Interview Status
+        </span>
+        <StatusBadge status={local.status} />
+      </div>
+    )
+  }
+
   return (
     <div className={cn("grid gap-2 sm:max-w-xs", className)}>
       <div className="flex flex-wrap items-center gap-2">
-        <Label htmlFor={fieldId}>Status</Label>
+        <Label htmlFor={fieldId}>Interview Status</Label>
         {showBadge ? <StatusBadge status={local.status} /> : null}
       </div>
-      <Select
+      <select
+        id={fieldId}
+        className="h-9 w-full rounded-lg border border-input bg-background px-2.5 text-sm outline-none hover:border-ring/40 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-input/30"
         value={local.status}
         disabled={busy}
-        onValueChange={(value) => {
-          if (value) void changeStatus(value as InterviewStatus)
+        aria-label="Interview status"
+        onChange={(event) => {
+          void changeStatus(event.target.value as InterviewStatus)
         }}
       >
-        <SelectTrigger id={fieldId} className="w-full bg-background">
-          <SelectValue>
-            {INTERVIEW_STATUS_LABELS[local.status] ?? local.status}
-          </SelectValue>
-        </SelectTrigger>
-        <SelectContent className="z-[200]">
-          {INTERVIEW_STATUSES.map((status) => (
-            <SelectItem
-              key={status}
-              value={status}
-              label={INTERVIEW_STATUS_LABELS[status]}
-            >
-              {INTERVIEW_STATUS_LABELS[status]}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+        {INTERVIEW_STATUSES.map((status) => (
+          <option key={status} value={status}>
+            {INTERVIEW_STATUS_LABELS[status]}
+          </option>
+        ))}
+      </select>
     </div>
   )
 }

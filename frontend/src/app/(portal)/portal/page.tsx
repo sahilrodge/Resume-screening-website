@@ -25,6 +25,7 @@ import {
 import { Progress } from "@/components/ui/progress"
 import { useAuth } from "@/features/auth/auth-provider"
 import { useCandidateSync } from "@/features/candidate/candidate-sync-provider"
+import { InterviewStatusSelect } from "@/features/interviews/interview-status-select"
 import { InterviewTimeline } from "@/features/interviews/interview-timeline"
 import { APPLICATION_STATUS_LABELS } from "@/types/application"
 import { cn } from "@/lib/utils"
@@ -443,8 +444,11 @@ export default function PortalHomePage() {
                             {formatWhen(item.scheduled_at)}
                           </p>
                         </div>
-                        <StatusBadge status={item.status} />
                       </div>
+                      <InterviewStatusSelect
+                        interview={item}
+                        editable={false}
+                      />
                       {item.timeline?.length ? (
                         <InterviewTimeline steps={item.timeline} />
                       ) : null}
