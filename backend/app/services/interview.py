@@ -116,12 +116,64 @@ def _build_timeline(obj: Interview) -> list[InterviewTimelineStep]:
     return steps
 
 
+def _application_status_for_interview(
+    interview_status: InterviewStatus,
+) -> ApplicationStatus | None:
+    """Map interview status → application pipeline status (single source of truth)."""
+    if interview_status == InterviewStatus.SELECTED:
+        return ApplicationStatus.SELECTED
+    if interview_status == InterviewStatus.REJECTED:
+        return ApplicationStatus.REJECTED
+    if interview_status == InterviewStatus.COMPLETED:
+        return ApplicationStatus.INTERVIEW_COMPLETED
+    if interview_status in {
+        InterviewStatus.SCHEDULED,
+        InterviewStatus.CONFIRMED,
+        InterviewStatus.RESCHEDULED,
+        InterviewStatus.IN_PROGRESS,
+    }:
+        return ApplicationStatus.INTERVIEW
+    return None
+
+
+_TERMINAL_APPLICATION = {
+    ApplicationStatus.SELECTED,
+    ApplicationStatus.REJECTED,
+    ApplicationStatus.HIRED,
+    ApplicationStatus.WITHDRAWN,
+}
+
+
+def _sync_application_status(
+    db: Session,
+    application,
+    interview_status: InterviewStatus,
+) -> None:
+    target = _application_status_for_interview(interview_status)
+    if target is None or application is None:
+        return
+    # Decisions always win; otherwise don't clobber hired/withdrawn/etc.
+    if (
+        application.status in _TERMINAL_APPLICATION
+        and target
+        not in {
+            ApplicationStatus.SELECTED,
+            ApplicationStatus.REJECTED,
+        }
+    ):
+        return
+    if application.status == target:
+        return
+    application_crud.update_status(db, db_obj=application, status=target)
+
+
 def _to_response(obj: Interview) -> InterviewResponse:
     app = obj.application
     candidate_id = app.candidate_id if app else None
     candidate_name = None
     job_title = None
     company_name = None
+    application_status = app.status if app else None
     if app and app.candidate and app.candidate.user:
         candidate_name = app.candidate.user.full_name
     if app and app.job:
@@ -141,6 +193,7 @@ def _to_response(obj: Interview) -> InterviewResponse:
         interviewer_id=obj.interviewer_id,
         interview_type=obj.interview_type,
         status=obj.status,
+        application_status=application_status,
         scheduled_at=obj.scheduled_at,
         duration_minutes=obj.duration_minutes,
         meeting_link=obj.meeting_link,
@@ -169,11 +222,7 @@ class InterviewService:
             location=data.location,
         )
 
-        application_crud.update_status(
-            db,
-            db_obj=application,
-            status=ApplicationStatus.INTERVIEW,
-        )
+        _sync_application_status(db, application, InterviewStatus.SCHEDULED)
         created = interview_crud.get(db, created.id)
 
         if created and created.application:
@@ -251,32 +300,9 @@ class InterviewService:
         previous = obj.status
         updated = interview_crud.update_status(db, db_obj=obj, status=data.status)
 
-        # Sync application decision statuses where appropriate
+        # Sync application pipeline status (single source of truth for badges)
         if updated and updated.application and previous != data.status:
-            application = updated.application
-            if data.status == InterviewStatus.SELECTED:
-                application_crud.update_status(
-                    db,
-                    db_obj=application,
-                    status=ApplicationStatus.SELECTED,
-                )
-            elif data.status == InterviewStatus.REJECTED:
-                application_crud.update_status(
-                    db,
-                    db_obj=application,
-                    status=ApplicationStatus.REJECTED,
-                )
-            elif data.status == InterviewStatus.CONFIRMED:
-                if application.status in {
-                    ApplicationStatus.APPLIED,
-                    ApplicationStatus.SCREENING,
-                    ApplicationStatus.SHORTLISTED,
-                }:
-                    application_crud.update_status(
-                        db,
-                        db_obj=application,
-                        status=ApplicationStatus.INTERVIEW,
-                    )
+            _sync_application_status(db, updated.application, data.status)
 
             updated = interview_crud.get(db, interview_id)
             assert updated is not None

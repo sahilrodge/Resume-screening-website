@@ -22,6 +22,7 @@ import { EmptyState } from "@/components/shared/empty-state"
 import { InlineAlert } from "@/components/shared/inline-alert"
 import { PageHeader } from "@/components/shared/page-header"
 import { PageSkeleton } from "@/components/shared/page-skeleton"
+import { ApplicationStatusBadge } from "@/components/shared/application-status-badge"
 import { useCandidateSync } from "@/features/candidate/candidate-sync-provider"
 import {
   formatEmploymentType,
@@ -183,9 +184,7 @@ function PortalJobsContent() {
                     : ""}
                 </p>
               </div>
-              <span className="text-sm capitalize text-muted-foreground">
-                {(app.status ?? "unknown").replaceAll("_", " ")}
-              </span>
+              <ApplicationStatusBadge status={app.status} />
             </li>
           ))}
         </ul>

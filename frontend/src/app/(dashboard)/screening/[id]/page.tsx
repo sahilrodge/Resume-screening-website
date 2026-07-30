@@ -5,7 +5,7 @@ import { useParams } from "next/navigation"
 import { useCallback, useEffect, useState } from "react"
 import { ArrowLeft, CalendarPlus, Download } from "lucide-react"
 
-import { StatusBadge } from "@/components/admin/status-badge"
+import { ApplicationStatusBadge } from "@/components/shared/application-status-badge"
 import { FadeIn, PageTransition } from "@/components/motion/page-transition"
 import { InlineAlert } from "@/components/shared/inline-alert"
 import { PageHeader } from "@/components/shared/page-header"
@@ -19,11 +19,14 @@ import { InterviewStatusSelect } from "@/features/interviews/interview-status-se
 import { InterviewTimeline } from "@/features/interviews/interview-timeline"
 import { MatchResultPanel } from "@/features/screening/match-result-panel"
 import { useApiLoading } from "@/hooks/use-api-loading"
+import {
+  publishApplicationStatusChange,
+  subscribeApplicationStatusChange,
+} from "@/lib/application-status-events"
 import { applicationsApi } from "@/services/applications"
 import { interviewsApi, type Interview } from "@/services/interviews"
 import { ApiError } from "@/types/api"
 import type { ApplicationMatch } from "@/types/application"
-import { APPLICATION_STATUS_LABELS } from "@/types/application"
 
 function formatWhen(iso: string) {
   try {
@@ -75,6 +78,22 @@ export default function ScreeningDetailPage() {
     void load()
   }, [load])
 
+  useEffect(() => {
+    return subscribeApplicationStatusChange(({ applicationId, status }) => {
+      if (applicationId !== id) return
+      setResult((current) =>
+        current ? { ...current, status } : current
+      )
+      setInterviews((current) =>
+        current.map((row) =>
+          row.application_id === applicationId
+            ? { ...row, application_status: status }
+            : row
+        )
+      )
+    })
+  }, [id])
+
   async function inviteInterview() {
     if (!interviewAt) {
       setError("Pick an interview date/time")
@@ -90,6 +109,13 @@ export default function ScreeningDetailPage() {
         interview_type: "video",
       })
       setInterviews((current) => [created, ...current])
+      if (created.application_status) {
+        publishApplicationStatusChange({
+          applicationId: id,
+          status: created.application_status,
+          interviewId: created.id,
+        })
+      }
       await load()
       setInterviewAt("")
       setMeetingLink("")
@@ -113,16 +139,6 @@ export default function ScreeningDetailPage() {
       setBusy(false)
     }
   }
-
-  const badgeLabel = result
-    ? result.status === "selected" ||
-      result.status === "hired" ||
-      result.status === "offered"
-      ? "Selected"
-      : result.status === "rejected"
-        ? "Rejected"
-        : APPLICATION_STATUS_LABELS[result.status]
-    : null
 
   const rejected = result?.status === "rejected"
 
@@ -155,7 +171,7 @@ export default function ScreeningDetailPage() {
                 Download report
               </Button>
             ) : null}
-            {badgeLabel ? <StatusBadge status={badgeLabel} /> : null}
+            {result ? <ApplicationStatusBadge status={result.status} /> : null}
           </div>
         }
       />

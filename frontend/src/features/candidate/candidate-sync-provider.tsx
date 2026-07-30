@@ -12,6 +12,7 @@ import {
 } from "react"
 
 import { candidatesApi } from "@/services/candidates"
+import { subscribeApplicationStatusChange } from "@/lib/application-status-events"
 import type { ApplicationMatch } from "@/types/application"
 import type { CandidateOverview } from "@/types/candidate-sync"
 import type { Job } from "@/types/job"
@@ -180,6 +181,23 @@ export function CandidateSyncProvider({ children }: { children: ReactNode }) {
     window.addEventListener("focus", onFocus)
     return () => window.removeEventListener("focus", onFocus)
   }, [refresh])
+
+  useEffect(() => {
+    return subscribeApplicationStatusChange(({ applicationId, status }) => {
+      setApplications((current) =>
+        current.map((row) =>
+          row.id === applicationId ? { ...row, status } : row
+        )
+      )
+      setInterviews((current) =>
+        current.map((row) =>
+          row.application_id === applicationId
+            ? { ...row, application_status: status }
+            : row
+        )
+      )
+    })
+  }, [])
 
   const markJobSaved = useCallback((jobId: string, saved: boolean) => {
     setSavedJobIds((prev) => {

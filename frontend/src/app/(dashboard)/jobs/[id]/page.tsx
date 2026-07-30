@@ -14,6 +14,7 @@ import {
 } from "lucide-react"
 
 import { StatusBadge } from "@/components/admin/status-badge"
+import { ApplicationStatusBadge } from "@/components/shared/application-status-badge"
 import { HirePulseMark } from "@/components/brand/hirepulse-mark"
 import { FadeIn, PageTransition } from "@/components/motion/page-transition"
 import { PageHeader } from "@/components/shared/page-header"
@@ -27,11 +28,11 @@ import {
   type JobUpdateValues,
 } from "@/features/jobs/schemas"
 import { useApiLoading } from "@/hooks/use-api-loading"
+import { subscribeApplicationStatusChange } from "@/lib/application-status-events"
 import { jobsApi } from "@/services/jobs"
 import { applicationsApi } from "@/services/applications"
 import { ApiError } from "@/types/api"
 import type { ApplicationMatch } from "@/types/application"
-import { APPLICATION_STATUS_LABELS } from "@/types/application"
 import type { Job } from "@/types/job"
 import { EMPLOYMENT_TYPE_LABELS, JOB_STATUS_LABELS } from "@/types/job"
 
@@ -68,6 +69,16 @@ export default function JobDetailsPage() {
   useEffect(() => {
     void load()
   }, [load])
+
+  useEffect(() => {
+    return subscribeApplicationStatusChange(({ applicationId, status }) => {
+      setMatches((current) =>
+        current.map((row) =>
+          row.id === applicationId ? { ...row, status } : row
+        )
+      )
+    })
+  }, [])
 
   async function handleUpdate(values: JobUpdateValues) {
     if (!job) return
@@ -298,15 +309,16 @@ export default function JobDetailsPage() {
                       key={m.id}
                       className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
                     >
-                      <div>
+                      <div className="min-w-0 space-y-1">
                         <p className="font-medium">{m.candidate_name || "Candidate"}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {m.summary
-                            ? `${m.summary.slice(0, 90)}${m.summary.length > 90 ? "…" : ""}`
-                            : APPLICATION_STATUS_LABELS[m.status]}
-                        </p>
+                        {m.summary ? (
+                          <p className="text-xs text-muted-foreground">
+                            {`${m.summary.slice(0, 90)}${m.summary.length > 90 ? "…" : ""}`}
+                          </p>
+                        ) : null}
                       </div>
                       <div className="flex items-center gap-3">
+                        <ApplicationStatusBadge status={m.status} />
                         <span className="font-heading text-lg font-semibold tabular-nums">
                           {m.match_score != null ? `${Math.round(m.match_score)}%` : "—"}
                         </span>

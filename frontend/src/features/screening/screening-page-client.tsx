@@ -28,14 +28,14 @@ import {
 } from "@/components/ui/table"
 import { MatchResultPanel } from "@/features/screening/match-result-panel"
 import { CandidateDecisionActions } from "@/features/screening/candidate-decision-actions"
-import { StatusBadge } from "@/components/admin/status-badge"
+import { ApplicationStatusBadge } from "@/components/shared/application-status-badge"
 import { useApiLoading } from "@/hooks/use-api-loading"
+import { subscribeApplicationStatusChange } from "@/lib/application-status-events"
 import { applicationsApi } from "@/services/applications"
 import { jobsApi } from "@/services/jobs"
 import { resumesApi } from "@/services/resumes"
 import { ApiError } from "@/types/api"
 import type { ApplicationMatch } from "@/types/application"
-import { APPLICATION_STATUS_LABELS } from "@/types/application"
 import type { Job } from "@/types/job"
 import type { Resume } from "@/types/resume"
 
@@ -227,6 +227,19 @@ export default function ScreeningPageClient() {
   useEffect(() => {
     void load()
   }, [load])
+
+  useEffect(() => {
+    return subscribeApplicationStatusChange(({ applicationId, status }) => {
+      setHistory((current) =>
+        current.map((row) =>
+          row.id === applicationId ? { ...row, status } : row
+        )
+      )
+      setResult((current) =>
+        current?.id === applicationId ? { ...current, status } : current
+      )
+    })
+  }, [])
 
   async function handleCompare() {
     if (!jobId || !resumeId) {
@@ -475,17 +488,7 @@ export default function ScreeningPageClient() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <StatusBadge
-                        status={
-                          row.status === "selected" ||
-                          row.status === "hired" ||
-                          row.status === "offered"
-                            ? "Selected"
-                            : row.status === "rejected"
-                              ? "Rejected"
-                              : APPLICATION_STATUS_LABELS[row.status]
-                        }
-                      />
+                      <ApplicationStatusBadge status={row.status} />
                     </TableCell>
                     <TableCell className="font-semibold tabular-nums">
                       {formatScore(row.ats_score ?? row.match_score)}

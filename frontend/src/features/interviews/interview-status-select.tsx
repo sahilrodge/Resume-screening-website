@@ -2,9 +2,11 @@
 
 import { useEffect, useId, useState } from "react"
 
+import { ApplicationStatusBadge } from "@/components/shared/application-status-badge"
 import { StatusBadge } from "@/components/admin/status-badge"
 import { useToast } from "@/components/shared/toast"
 import { Label } from "@/components/ui/label"
+import { publishApplicationStatusChange } from "@/lib/application-status-events"
 import {
   INTERVIEW_STATUS_LABELS,
   INTERVIEW_STATUSES,
@@ -13,6 +15,7 @@ import {
   type InterviewStatus,
 } from "@/services/interviews"
 import { ApiError } from "@/types/api"
+import type { ApplicationStatus } from "@/types/application"
 import { cn } from "@/lib/utils"
 
 type InterviewStatusSelectProps = {
@@ -22,12 +25,13 @@ type InterviewStatusSelectProps = {
   showBadge?: boolean
   /** When false, renders read-only badge (candidates). Default: editable. */
   editable?: boolean
+  /** Also show the linked application pipeline badge. */
+  showApplicationBadge?: boolean
 }
 
 /**
  * Interview status control — persists via PATCH /interviews/{id}/status.
- * Uses a native <select> so the control is always visible (Base UI Select
- * portals were easy to miss / fail inside transformed cards after scheduling).
+ * Publishes application status changes so every open page stays in sync.
  */
 export function InterviewStatusSelect({
   interview,
@@ -35,6 +39,7 @@ export function InterviewStatusSelect({
   className,
   showBadge = true,
   editable = true,
+  showApplicationBadge = true,
 }: InterviewStatusSelectProps) {
   const { toast } = useToast()
   const fieldId = useId()
@@ -54,6 +59,13 @@ export function InterviewStatusSelect({
       const updated = await interviewsApi.updateStatus(local.id, { status })
       setLocal(updated)
       onUpdated?.(updated)
+      if (updated.application_id && updated.application_status) {
+        publishApplicationStatusChange({
+          applicationId: updated.application_id,
+          status: updated.application_status as ApplicationStatus,
+          interviewId: updated.id,
+        })
+      }
       toast(
         `Interview status updated to ${INTERVIEW_STATUS_LABELS[status]}.`,
         "success"
@@ -78,6 +90,9 @@ export function InterviewStatusSelect({
           Interview Status
         </span>
         <StatusBadge status={local.status} />
+        {showApplicationBadge && local.application_status ? (
+          <ApplicationStatusBadge status={local.application_status} />
+        ) : null}
       </div>
     )
   }
@@ -87,6 +102,9 @@ export function InterviewStatusSelect({
       <div className="flex flex-wrap items-center gap-2">
         <Label htmlFor={fieldId}>Interview Status</Label>
         {showBadge ? <StatusBadge status={local.status} /> : null}
+        {showApplicationBadge && local.application_status ? (
+          <ApplicationStatusBadge status={local.application_status} />
+        ) : null}
       </div>
       <select
         id={fieldId}

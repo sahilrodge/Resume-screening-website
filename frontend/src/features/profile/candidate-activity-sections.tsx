@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 
+import { ApplicationStatusBadge } from "@/components/shared/application-status-badge"
 import { buttonVariants } from "@/components/ui/button"
 import {
   Card,
@@ -13,7 +14,6 @@ import {
 import { InterviewStatusSelect } from "@/features/interviews/interview-status-select"
 import { InterviewTimeline } from "@/features/interviews/interview-timeline"
 import { useCandidateSync } from "@/features/candidate/candidate-sync-provider"
-import { APPLICATION_STATUS_LABELS } from "@/types/application"
 import { formatEmploymentType, formatJobDate } from "@/features/jobs/format"
 import { cn } from "@/lib/utils"
 
@@ -166,9 +166,7 @@ export function CandidateActivitySections() {
                       {formatJobDate(app.created_at)}
                     </p>
                   </div>
-                  <span className="text-xs capitalize text-muted-foreground">
-                    {APPLICATION_STATUS_LABELS[app.status] ?? app.status}
-                  </span>
+                  <ApplicationStatusBadge status={app.status} />
                 </li>
               ))}
             </ul>

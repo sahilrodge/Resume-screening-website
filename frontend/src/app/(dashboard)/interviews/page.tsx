@@ -5,6 +5,7 @@ import Link from "next/link"
 import { CalendarPlus, Video } from "lucide-react"
 
 import { StatusBadge } from "@/components/admin/status-badge"
+import { ApplicationStatusBadge } from "@/components/shared/application-status-badge"
 import { FadeIn, PageTransition } from "@/components/motion/page-transition"
 import { EmptyState } from "@/components/shared/empty-state"
 import { InlineAlert } from "@/components/shared/inline-alert"
@@ -31,6 +32,11 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { InterviewStatusSelect } from "@/features/interviews/interview-status-select"
 import { InterviewTimeline } from "@/features/interviews/interview-timeline"
+import { APPLICATION_STATUS_LABELS } from "@/lib/application-status"
+import {
+  publishApplicationStatusChange,
+  subscribeApplicationStatusChange,
+} from "@/lib/application-status-events"
 import { applicationsApi } from "@/services/applications"
 import {
   interviewsApi,
@@ -38,7 +44,6 @@ import {
 } from "@/services/interviews"
 import { ApiError } from "@/types/api"
 import type { ApplicationMatch } from "@/types/application"
-import { APPLICATION_STATUS_LABELS } from "@/types/application"
 
 function formatWhen(iso: string) {
   try {
@@ -95,6 +100,23 @@ export default function InterviewsPage() {
     }
   }, [])
 
+  useEffect(() => {
+    return subscribeApplicationStatusChange(({ applicationId, status }) => {
+      setItems((current) =>
+        current.map((row) =>
+          row.application_id === applicationId
+            ? { ...row, application_status: status }
+            : row
+        )
+      )
+      setApplicants((current) =>
+        current.map((row) =>
+          row.id === applicationId ? { ...row, status } : row
+        )
+      )
+    })
+  }, [])
+
   const schedulable = useMemo(() => {
     return applicants.filter(
       (app) =>
@@ -123,6 +145,13 @@ export default function InterviewsPage() {
         interview_type: "video",
       })
       setItems((current) => [created, ...current])
+      if (created.application_id && created.application_status) {
+        publishApplicationStatusChange({
+          applicationId: created.application_id,
+          status: created.application_status,
+          interviewId: created.id,
+        })
+      }
       setScheduleOpen(false)
       setApplicationId("")
       setInterviewAt("")
@@ -204,6 +233,9 @@ export default function InterviewsPage() {
                 <div className="flex flex-wrap items-center gap-2">
                   <StatusBadge status={item.interview_type} />
                   <StatusBadge status={item.status} />
+                  {item.application_status ? (
+                    <ApplicationStatusBadge status={item.application_status} />
+                  ) : null}
                 </div>
               </CardHeader>
 

@@ -1,4 +1,5 @@
 import { apiClient } from "@/lib/api"
+import type { ApplicationStatus } from "@/types/application"
 
 export const INTERVIEW_STATUSES = [
   "scheduled",
@@ -44,6 +45,8 @@ export type Interview = {
   interviewer_id: string | null
   interview_type: "phone" | "video" | "onsite"
   status: InterviewStatus
+  /** Synced application pipeline status (source of truth for app badges). */
+  application_status?: ApplicationStatus | null
   scheduled_at: string
   duration_minutes: number
   meeting_link: string | null

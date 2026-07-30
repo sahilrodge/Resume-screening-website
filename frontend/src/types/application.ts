@@ -3,6 +3,7 @@ export type ApplicationStatus =
   | "screening"
   | "shortlisted"
   | "interview"
+  | "interview_completed"
   | "offered"
   | "selected"
   | "rejected"
@@ -48,14 +49,8 @@ export type ComparePayload = {
   resume_id: string
 }
 
-export const APPLICATION_STATUS_LABELS: Record<ApplicationStatus, string> = {
-  applied: "Applied",
-  screening: "Under Review",
-  shortlisted: "Shortlisted",
-  interview: "Interview",
-  offered: "Offered",
-  selected: "Selected",
-  rejected: "Rejected",
-  hired: "Hired",
-  withdrawn: "Withdrawn",
-}
+/** Re-export shared labels so existing imports keep working. */
+export {
+  APPLICATION_STATUS_LABELS,
+  applicationStatusLabel,
+} from "@/lib/application-status"

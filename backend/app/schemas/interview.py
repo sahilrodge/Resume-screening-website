@@ -8,7 +8,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app.models.enums import InterviewStatus, InterviewType
+from app.models.enums import ApplicationStatus, InterviewStatus, InterviewType
 
 
 class InterviewCreate(BaseModel):
@@ -56,6 +56,8 @@ class InterviewResponse(BaseModel):
     interviewer_id: uuid.UUID | None = None
     interview_type: InterviewType
     status: InterviewStatus
+    # Linked application status — single source of truth for pipeline badges.
+    application_status: ApplicationStatus | None = None
     scheduled_at: datetime
     duration_minutes: int
     meeting_link: str | None = None

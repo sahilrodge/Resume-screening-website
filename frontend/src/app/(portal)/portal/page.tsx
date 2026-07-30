@@ -14,6 +14,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { buttonVariants } from "@/components/ui/button"
+import { ApplicationStatusBadge } from "@/components/shared/application-status-badge"
 import { StatusBadge } from "@/components/admin/status-badge"
 import {
   Card,
@@ -27,7 +28,6 @@ import { useAuth } from "@/features/auth/auth-provider"
 import { useCandidateSync } from "@/features/candidate/candidate-sync-provider"
 import { InterviewStatusSelect } from "@/features/interviews/interview-status-select"
 import { InterviewTimeline } from "@/features/interviews/interview-timeline"
-import { APPLICATION_STATUS_LABELS } from "@/types/application"
 import { cn } from "@/lib/utils"
 
 function initials(name?: string | null) {
@@ -398,9 +398,7 @@ export default function PortalHomePage() {
                           : ""}
                       </p>
                     </div>
-                    <Badge variant="outline" className="shrink-0 capitalize">
-                      {APPLICATION_STATUS_LABELS[app.status] ?? app.status}
-                    </Badge>
+                    <ApplicationStatusBadge status={app.status} />
                   </li>
                 ))}
               </ul>

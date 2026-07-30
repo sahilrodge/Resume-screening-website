@@ -3,31 +3,22 @@
 import { useCallback, useEffect, useState } from "react"
 import { CheckCircle2, XCircle } from "lucide-react"
 
-import { StatusBadge } from "@/components/admin/status-badge"
+import { ApplicationStatusBadge } from "@/components/shared/application-status-badge"
 import { ConfirmDialog } from "@/components/shared/confirm-dialog"
 import { useToast } from "@/components/shared/toast"
 import { Button } from "@/components/ui/button"
+import {
+  applicationStatusLabel,
+  isRejectedApplicationStatus,
+  isSelectedApplicationStatus,
+} from "@/lib/application-status"
+import { publishApplicationStatusChange } from "@/lib/application-status-events"
 import { cn } from "@/lib/utils"
 import { applicationsApi } from "@/services/applications"
 import { ApiError } from "@/types/api"
-import type { ApplicationMatch, ApplicationStatus } from "@/types/application"
-import { APPLICATION_STATUS_LABELS } from "@/types/application"
+import type { ApplicationMatch } from "@/types/application"
 
 type Decision = "selected" | "rejected"
-
-function isSelectedStatus(status: ApplicationStatus) {
-  return status === "selected" || status === "hired" || status === "offered"
-}
-
-function isRejectedStatus(status: ApplicationStatus) {
-  return status === "rejected"
-}
-
-function displayBadge(status: ApplicationStatus) {
-  if (isSelectedStatus(status)) return "Selected"
-  if (isRejectedStatus(status)) return "Rejected"
-  return APPLICATION_STATUS_LABELS[status] ?? status
-}
 
 type CandidateDecisionActionsProps = {
   application: ApplicationMatch
@@ -51,8 +42,8 @@ export function CandidateDecisionActions({
     setLocal(application)
   }, [application])
 
-  const selected = isSelectedStatus(local.status)
-  const rejected = isRejectedStatus(local.status)
+  const selected = isSelectedApplicationStatus(local.status)
+  const rejected = isRejectedApplicationStatus(local.status)
   const decided = selected || rejected
 
   const closeConfirm = useCallback(() => {
@@ -72,6 +63,10 @@ export function CandidateDecisionActions({
       })
       setLocal(updated)
       onUpdated?.(updated)
+      publishApplicationStatusChange({
+        applicationId: updated.id,
+        status: updated.status,
+      })
       setConfirm(null)
       toast(
         decision === "selected"
@@ -94,7 +89,7 @@ export function CandidateDecisionActions({
   return (
     <div className={cn("space-y-3", className)}>
       <div className="flex flex-wrap items-center gap-2">
-        {showBadge ? <StatusBadge status={displayBadge(local.status)} /> : null}
+        {showBadge ? <ApplicationStatusBadge status={local.status} /> : null}
         <Button
           type="button"
           variant={rejected ? "destructive" : "outline"}
@@ -151,4 +146,8 @@ export function CandidateDecisionActions({
   )
 }
 
-export { isSelectedStatus, isRejectedStatus, displayBadge }
+export {
+  isSelectedApplicationStatus as isSelectedStatus,
+  isRejectedApplicationStatus as isRejectedStatus,
+  applicationStatusLabel as displayBadge,
+}

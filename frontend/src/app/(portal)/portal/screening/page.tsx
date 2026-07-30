@@ -4,6 +4,7 @@ import { useMemo, useState } from "react"
 import { Download, Sparkles } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { ApplicationStatusBadge } from "@/components/shared/application-status-badge"
 import { EmptyState } from "@/components/shared/empty-state"
 import { InlineAlert } from "@/components/shared/inline-alert"
 import { PageHeader } from "@/components/shared/page-header"
@@ -69,6 +70,7 @@ export default function PortalScreeningPage() {
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-3 text-sm">
+                <ApplicationStatusBadge status={app.status} />
                 <span className="rounded-md bg-muted px-2 py-0.5 text-xs font-medium">
                   {app.scoring_engine === "openai"
                     ? "AI Score"
