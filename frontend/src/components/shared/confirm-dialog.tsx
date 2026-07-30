@@ -23,9 +23,11 @@ type ConfirmDialogProps = {
 }
 
 /**
- * Controlled confirm modal built on the shared Dialog primitive.
- * (Custom createPortal + full-screen backdrop was closing immediately on the
- * same click that opened it in some browsers, so Select/Reject appeared dead.)
+ * Controlled confirm modal on the shared Dialog primitive.
+ *
+ * Important: do not set initialFocus={false}. With modal dialogs, leaving focus
+ * on the outside trigger causes an immediate focus-out close — Select/Reject
+ * then looks like a no-op (popup never appears).
  */
 export function ConfirmDialog({
   open,
@@ -41,15 +43,14 @@ export function ConfirmDialog({
   return (
     <Dialog
       open={open}
+      // Confirm actions use explicit Cancel / Confirm buttons. Disabling
+      // pointer dismissal also avoids the opening click dismissing the modal.
+      disablePointerDismissal
       onOpenChange={(next) => {
         if (!next && !busy) onCancel()
       }}
     >
-      <DialogContent
-        showCloseButton={false}
-        className="sm:max-w-md"
-        initialFocus={false}
-      >
+      <DialogContent showCloseButton={false} className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
@@ -59,7 +60,9 @@ export function ConfirmDialog({
             type="button"
             variant="outline"
             disabled={busy}
-            onClick={onCancel}
+            onClick={() => {
+              if (!busy) onCancel()
+            }}
           >
             {cancelLabel}
           </Button>

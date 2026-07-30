@@ -53,10 +53,16 @@ export function CandidateDecisionActions({
 
   const selected = isSelectedStatus(local.status)
   const rejected = isRejectedStatus(local.status)
+  const decided = selected || rejected
 
   const closeConfirm = useCallback(() => {
     if (!busy) setConfirm(null)
   }, [busy])
+
+  function openConfirm(decision: Decision) {
+    if (busy || decided) return
+    setConfirm(decision)
+  }
 
   async function applyDecision(decision: Decision) {
     setBusy(true)
@@ -96,13 +102,11 @@ export function CandidateDecisionActions({
             rejected &&
               "bg-rose-600 text-white hover:bg-rose-600/90 disabled:opacity-100"
           )}
-          disabled={busy || selected || rejected}
+          disabled={busy || decided}
           onClick={(event) => {
             event.preventDefault()
             event.stopPropagation()
-            if (busy || selected || rejected) return
-            // Defer open so the triggering click cannot dismiss the dialog.
-            window.setTimeout(() => setConfirm("rejected"), 0)
+            openConfirm("rejected")
           }}
         >
           <XCircle className="size-4" />
@@ -114,12 +118,11 @@ export function CandidateDecisionActions({
             selected &&
               "bg-emerald-600 text-white hover:bg-emerald-600/90 disabled:opacity-100"
           )}
-          disabled={busy || selected || rejected}
+          disabled={busy || decided}
           onClick={(event) => {
             event.preventDefault()
             event.stopPropagation()
-            if (busy || selected || rejected) return
-            window.setTimeout(() => setConfirm("selected"), 0)
+            openConfirm("selected")
           }}
         >
           <CheckCircle2 className="size-4" />
@@ -129,10 +132,10 @@ export function CandidateDecisionActions({
 
       <ConfirmDialog
         open={confirm != null}
-        title={confirm === "selected" ? "Select candidate" : "Reject candidate"}
+        title={confirm === "selected" ? "Select Candidate" : "Reject Candidate"}
         description={
           confirm === "selected"
-            ? "Are you sure you want to select this candidate for the next stage?"
+            ? "Are you sure you want to move this candidate to the next stage?"
             : "Are you sure you want to reject this candidate?"
         }
         confirmLabel="Confirm"
