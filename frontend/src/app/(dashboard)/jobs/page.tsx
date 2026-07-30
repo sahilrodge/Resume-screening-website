@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { useCallback, useEffect, useState } from "react"
 import {
+  Briefcase,
   ChevronLeft,
   ChevronRight,
   Eye,
@@ -15,7 +16,10 @@ import {
 import { AdminTableShell } from "@/components/admin/admin-table-shell"
 import { StatusBadge } from "@/components/admin/status-badge"
 import { FadeIn, PageTransition } from "@/components/motion/page-transition"
+import { EmptyState } from "@/components/shared/empty-state"
+import { InlineAlert } from "@/components/shared/inline-alert"
 import { PageHeader } from "@/components/shared/page-header"
+import { TableSkeleton } from "@/components/shared/page-skeleton"
 import { Badge } from "@/components/ui/badge"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -274,11 +278,7 @@ export default function JobsPage() {
         </FadeIn>
       ) : null}
 
-      {error ? (
-        <p className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-          {error}
-        </p>
-      ) : null}
+      {error ? <InlineAlert variant="error">{error}</InlineAlert> : null}
 
       <FadeIn>
         <AdminTableShell
@@ -336,143 +336,153 @@ export default function JobsPage() {
             </div>
           }
         >
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>
-                  <button type="button" className="font-medium" onClick={() => toggleSort("title")}>
-                    Role
-                  </button>
-                </TableHead>
-                <TableHead className="hidden md:table-cell">Company</TableHead>
-                <TableHead className="hidden lg:table-cell">
-                  <button
-                    type="button"
-                    className="font-medium"
-                    onClick={() => toggleSort("employment_type")}
-                  >
-                    Type
-                  </button>
-                </TableHead>
-                <TableHead>
-                  <button
-                    type="button"
-                    className="font-medium"
-                    onClick={() => toggleSort("application_count")}
-                  >
-                    Applicants
-                  </button>
-                </TableHead>
-                <TableHead>
-                  <button
-                    type="button"
-                    className="font-medium"
-                    onClick={() => toggleSort("status")}
-                  >
-                    Status
-                  </button>
-                </TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {items.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                    {loading ? "Loading jobs..." : "No jobs found"}
-                  </TableCell>
-                </TableRow>
-              ) : (
-                items.map((row) => (
-                  <TableRow key={row.id} className="transition-colors hover:bg-muted/40">
-                    <TableCell>
-                      <Link href={`/jobs/${row.id}`} className="block hover:underline">
-                        <div className="font-medium">{row.title}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {row.location || "Remote / n/a"} · {row.openings} opening
-                          {row.openings === 1 ? "" : "s"}
-                        </div>
-                      </Link>
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell">
-                      {row.company_id ? (
-                        <Link
-                          href={`/companies/${row.company_id}`}
-                          className="hover:underline"
-                        >
-                          {row.company_name || "—"}
-                        </Link>
-                      ) : (
-                        row.company_name || "—"
-                      )}
-                    </TableCell>
-                    <TableCell className="hidden lg:table-cell">
-                      <Badge variant="outline">
-                        {EMPLOYMENT_TYPE_LABELS[row.employment_type]}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="font-medium tabular-nums">
-                      {row.application_count}
-                    </TableCell>
-                    <TableCell>
-                      <StatusBadge status={JOB_STATUS_LABELS[row.status]} />
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        <Link
-                          href={`/jobs/${row.id}`}
-                          className={buttonVariants({ variant: "ghost", size: "icon-sm" })}
-                          aria-label="View details"
-                        >
-                          <Eye />
-                        </Link>
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          onClick={() => openEdit(row)}
-                          aria-label="Edit"
-                        >
-                          <Pencil />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          onClick={() => void handleDelete(row)}
-                          aria-label="Delete"
-                        >
-                          <Trash2 />
-                        </Button>
-                      </div>
-                    </TableCell>
+          {loading && items.length === 0 ? (
+            <TableSkeleton cols={6} />
+          ) : items.length === 0 ? (
+            <EmptyState
+              icon={Briefcase}
+              title="No jobs found"
+              description="Try adjusting filters, or create a new role to get started."
+              action={
+                <Button onClick={openCreate}>
+                  <Plus data-icon="inline-start" />
+                  Create job
+                </Button>
+              }
+            />
+          ) : (
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>
+                      <button type="button" className="font-medium" onClick={() => toggleSort("title")}>
+                        Role
+                      </button>
+                    </TableHead>
+                    <TableHead className="hidden md:table-cell">Company</TableHead>
+                    <TableHead className="hidden lg:table-cell">
+                      <button
+                        type="button"
+                        className="font-medium"
+                        onClick={() => toggleSort("employment_type")}
+                      >
+                        Type
+                      </button>
+                    </TableHead>
+                    <TableHead>
+                      <button
+                        type="button"
+                        className="font-medium"
+                        onClick={() => toggleSort("application_count")}
+                      >
+                        Applicants
+                      </button>
+                    </TableHead>
+                    <TableHead>
+                      <button
+                        type="button"
+                        className="font-medium"
+                        onClick={() => toggleSort("status")}
+                      >
+                        Status
+                      </button>
+                    </TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                </TableHeader>
+                <TableBody>
+                  {items.map((row) => (
+                    <TableRow key={row.id} className="transition-colors hover:bg-muted/40">
+                      <TableCell>
+                        <Link href={`/jobs/${row.id}`} className="block hover:underline">
+                          <div className="font-medium">{row.title}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {row.location || "Remote / n/a"} · {row.openings} opening
+                            {row.openings === 1 ? "" : "s"}
+                          </div>
+                        </Link>
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell">
+                        {row.company_id ? (
+                          <Link
+                            href={`/companies/${row.company_id}`}
+                            className="hover:underline"
+                          >
+                            {row.company_name || "—"}
+                          </Link>
+                        ) : (
+                          row.company_name || "—"
+                        )}
+                      </TableCell>
+                      <TableCell className="hidden lg:table-cell">
+                        <Badge variant="outline">
+                          {EMPLOYMENT_TYPE_LABELS[row.employment_type]}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="font-medium tabular-nums">
+                        {row.application_count}
+                      </TableCell>
+                      <TableCell>
+                        <StatusBadge status={JOB_STATUS_LABELS[row.status]} />
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          <Link
+                            href={`/jobs/${row.id}`}
+                            className={buttonVariants({ variant: "ghost", size: "icon-sm" })}
+                            aria-label="View details"
+                          >
+                            <Eye />
+                          </Link>
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={() => openEdit(row)}
+                            aria-label="Edit"
+                          >
+                            <Pencil />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={() => void handleDelete(row)}
+                            aria-label="Delete"
+                          >
+                            <Trash2 />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
 
-          <div className="mt-4 flex items-center justify-between gap-2">
-            <p className="text-sm text-muted-foreground">
-              Page {page} of {pages || 1}
-            </p>
-            <div className="flex gap-1">
-              <Button
-                variant="outline"
-                size="icon-sm"
-                disabled={page <= 1}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-              >
-                <ChevronLeft />
-              </Button>
-              <Button
-                variant="outline"
-                size="icon-sm"
-                disabled={page >= pages}
-                onClick={() => setPage((p) => p + 1)}
-              >
-                <ChevronRight />
-              </Button>
-            </div>
-          </div>
+              <div className="mt-4 flex items-center justify-between gap-2">
+                <p className="text-sm text-muted-foreground">
+                  Page {page} of {pages || 1}
+                </p>
+                <div className="flex gap-1">
+                  <Button
+                    variant="outline"
+                    size="icon-sm"
+                    disabled={page <= 1}
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  >
+                    <ChevronLeft />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon-sm"
+                    disabled={page >= pages}
+                    onClick={() => setPage((p) => p + 1)}
+                  >
+                    <ChevronRight />
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
         </AdminTableShell>
       </FadeIn>
 

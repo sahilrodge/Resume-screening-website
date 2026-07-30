@@ -7,12 +7,16 @@ import {
   RefreshCw,
   Trash2,
   UserCheck,
+  Users,
   UserX,
 } from "lucide-react"
 
 import { StatusBadge } from "@/components/admin/status-badge"
 import { FadeIn, PageTransition } from "@/components/motion/page-transition"
+import { EmptyState } from "@/components/shared/empty-state"
+import { InlineAlert } from "@/components/shared/inline-alert"
 import { PageHeader } from "@/components/shared/page-header"
+import { TableSkeleton } from "@/components/shared/page-skeleton"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -435,161 +439,160 @@ export default function UsersPage() {
       </FadeIn>
 
       {error ? (
-        <p className="mb-4 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
+        <InlineAlert variant="error" className="mb-4">
           {error}
-        </p>
+        </InlineAlert>
       ) : null}
       {success ? (
-        <p className="mb-4 rounded-lg bg-emerald-500/10 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-300">
+        <InlineAlert variant="success" className="mb-4">
           {success}
-        </p>
+        </InlineAlert>
       ) : null}
 
       <FadeIn>
-        <div className="overflow-x-auto rounded-lg border border-border/70">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead className="hidden md:table-cell">Company</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="hidden lg:table-cell">
-                  Registration
-                </TableHead>
-                <TableHead className="hidden xl:table-cell">Last login</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
+        {loading && items.length === 0 ? (
+          <TableSkeleton cols={8} />
+        ) : !loading && items.length === 0 ? (
+          <EmptyState
+            icon={Users}
+            title="No users found"
+            description="Try a different search or invite a new team member."
+            action={
+              <Button onClick={() => setInviteOpen(true)}>Invite user</Button>
+            }
+          />
+        ) : (
+          <div className="overflow-x-auto rounded-lg border border-border/70">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={8} className="text-muted-foreground">
-                    Loading…
-                  </TableCell>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Role</TableHead>
+                  <TableHead className="hidden md:table-cell">Company</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="hidden lg:table-cell">
+                    Registration
+                  </TableHead>
+                  <TableHead className="hidden xl:table-cell">Last login</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
-              ) : null}
-              {!loading && items.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="text-muted-foreground">
-                    No users found.
-                  </TableCell>
-                </TableRow>
-              ) : null}
-              {items.map((user) => {
-                const isSelf = currentUser?.id === user.id
-                const isProtected = Boolean(user.is_super_admin)
-                return (
-                  <TableRow key={user.id}>
-                    <TableCell className="font-medium">
-                      <span className="inline-flex flex-wrap items-center gap-2">
-                        {user.full_name}
-                        {isProtected ? (
-                          <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-200">
-                            Super Admin
-                          </span>
-                        ) : null}
-                      </span>
-                    </TableCell>
-                    <TableCell>{user.email}</TableCell>
-                    <TableCell className="capitalize">{user.role}</TableCell>
-                    <TableCell className="hidden md:table-cell">
-                      {user.company_name || "—"}
-                    </TableCell>
-                    <TableCell>
-                      <StatusBadge
-                        status={user.is_active ? "Active" : "Suspended"}
-                      />
-                    </TableCell>
-                    <TableCell className="hidden text-xs text-muted-foreground lg:table-cell">
-                      {formatDate(user.created_at)}
-                    </TableCell>
-                    <TableCell className="hidden text-xs text-muted-foreground xl:table-cell">
-                      {formatDate(user.last_login)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        <Button
-                          size="icon-sm"
-                          variant="ghost"
-                          aria-label="Edit"
-                          disabled={busyId === user.id}
-                          onClick={() => openEdit(user)}
-                        >
-                          <Pencil />
-                        </Button>
-                        {user.is_active ? (
+              </TableHeader>
+              <TableBody>
+                {items.map((user) => {
+                  const isSelf = currentUser?.id === user.id
+                  const isProtected = Boolean(user.is_super_admin)
+                  return (
+                    <TableRow key={user.id}>
+                      <TableCell className="font-medium">
+                        <span className="inline-flex flex-wrap items-center gap-2">
+                          {user.full_name}
+                          {isProtected ? (
+                            <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-200">
+                              Super Admin
+                            </span>
+                          ) : null}
+                        </span>
+                      </TableCell>
+                      <TableCell>{user.email}</TableCell>
+                      <TableCell className="capitalize">{user.role}</TableCell>
+                      <TableCell className="hidden md:table-cell">
+                        {user.company_name || "—"}
+                      </TableCell>
+                      <TableCell>
+                        <StatusBadge
+                          status={user.is_active ? "Active" : "Suspended"}
+                        />
+                      </TableCell>
+                      <TableCell className="hidden text-xs text-muted-foreground lg:table-cell">
+                        {formatDate(user.created_at)}
+                      </TableCell>
+                      <TableCell className="hidden text-xs text-muted-foreground xl:table-cell">
+                        {formatDate(user.last_login)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
                           <Button
                             size="icon-sm"
                             variant="ghost"
-                            aria-label="Suspend"
+                            aria-label="Edit"
+                            disabled={busyId === user.id}
+                            onClick={() => openEdit(user)}
+                          >
+                            <Pencil />
+                          </Button>
+                          {user.is_active ? (
+                            <Button
+                              size="icon-sm"
+                              variant="ghost"
+                              aria-label="Suspend"
+                              disabled={
+                                busyId === user.id || isSelf || isProtected
+                              }
+                              title={
+                                isProtected
+                                  ? "Super Admin cannot be suspended"
+                                  : undefined
+                              }
+                              onClick={() => void suspendUser(user)}
+                            >
+                              <UserX />
+                            </Button>
+                          ) : (
+                            <Button
+                              size="icon-sm"
+                              variant="ghost"
+                              aria-label="Activate"
+                              disabled={busyId === user.id}
+                              onClick={() => void activateUser(user)}
+                            >
+                              <UserCheck />
+                            </Button>
+                          )}
+                          <Button
+                            size="icon-sm"
+                            variant="ghost"
+                            aria-label="Reset password"
                             disabled={
-                              busyId === user.id || isSelf || isProtected
+                              busyId === user.id ||
+                              (isProtected && currentUser?.id !== user.id)
                             }
                             title={
-                              isProtected
-                                ? "Super Admin cannot be suspended"
+                              isProtected && currentUser?.id !== user.id
+                                ? "Only Super Admin can reset this password"
                                 : undefined
                             }
-                            onClick={() => void suspendUser(user)}
+                            onClick={() => {
+                              setResetUser(user)
+                              setNewPassword("")
+                              setConfirmPassword("")
+                            }}
                           >
-                            <UserX />
+                            <KeyRound />
                           </Button>
-                        ) : (
                           <Button
                             size="icon-sm"
                             variant="ghost"
-                            aria-label="Activate"
-                            disabled={busyId === user.id}
-                            onClick={() => void activateUser(user)}
+                            aria-label="Delete"
+                            disabled={busyId === user.id || isSelf || isProtected}
+                            title={
+                              isProtected
+                                ? "Super Admin cannot be deleted"
+                                : undefined
+                            }
+                            onClick={() => void deleteUser(user)}
                           >
-                            <UserCheck />
+                            <Trash2 />
                           </Button>
-                        )}
-                        <Button
-                          size="icon-sm"
-                          variant="ghost"
-                          aria-label="Reset password"
-                          disabled={
-                            busyId === user.id ||
-                            (isProtected && currentUser?.id !== user.id)
-                          }
-                          title={
-                            isProtected && currentUser?.id !== user.id
-                              ? "Only Super Admin can reset this password"
-                              : undefined
-                          }
-                          onClick={() => {
-                            setResetUser(user)
-                            setNewPassword("")
-                            setConfirmPassword("")
-                          }}
-                        >
-                          <KeyRound />
-                        </Button>
-                        <Button
-                          size="icon-sm"
-                          variant="ghost"
-                          aria-label="Delete"
-                          disabled={busyId === user.id || isSelf || isProtected}
-                          title={
-                            isProtected
-                              ? "Super Admin cannot be deleted"
-                              : undefined
-                          }
-                          onClick={() => void deleteUser(user)}
-                        >
-                          <Trash2 />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                )
-              })}
-            </TableBody>
-          </Table>
-        </div>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        )}
       </FadeIn>
 
       <div className="mt-4 flex items-center justify-between gap-3">

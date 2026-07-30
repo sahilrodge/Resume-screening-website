@@ -16,8 +16,13 @@ export function PageSkeleton({
   withFilters = false,
 }: PageSkeletonProps) {
   return (
-    <div className={cn("space-y-6", className)} aria-busy="true" aria-live="polite">
-      {withHeader ? (
+    <div
+      className={cn("space-y-6", className)}
+      role="status"
+      aria-busy="true"
+      aria-live="polite"
+    >
+      <span className="sr-only">Loading…</span>      {withHeader ? (
         <div className="space-y-2">
           <Skeleton className="h-8 w-48 max-w-full sm:w-64" />
           <Skeleton className="h-4 w-full max-w-md" />
@@ -83,9 +88,10 @@ export function TableSkeleton({
   return (
     <div
       className={cn("overflow-hidden rounded-xl border border-border/70", className)}
+      role="status"
       aria-busy="true"
     >
-      <div className="hidden gap-3 border-b border-border bg-muted/40 px-4 py-3 sm:grid"
+      <span className="sr-only">Loading table…</span>      <div className="hidden gap-3 border-b border-border bg-muted/40 px-4 py-3 sm:grid"
         style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
       >
         {Array.from({ length: cols }).map((_, i) => (

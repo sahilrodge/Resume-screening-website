@@ -7,6 +7,7 @@ import { ArrowLeft, CalendarPlus, CheckCircle2, Download, XCircle } from "lucide
 
 import { StatusBadge } from "@/components/admin/status-badge"
 import { FadeIn, PageTransition } from "@/components/motion/page-transition"
+import { InlineAlert } from "@/components/shared/inline-alert"
 import { PageHeader } from "@/components/shared/page-header"
 import { Button, buttonVariants } from "@/components/ui/button"
 import {
@@ -169,16 +170,8 @@ export default function ScreeningDetailPage() {
         }
       />
 
-      {error ? (
-        <p className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-          {error}
-        </p>
-      ) : null}
-      {note ? (
-        <p className="rounded-md border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 text-sm text-emerald-800 dark:text-emerald-200">
-          {note}
-        </p>
-      ) : null}
+      {error ? <InlineAlert variant="error">{error}</InlineAlert> : null}
+      {note ? <InlineAlert variant="success">{note}</InlineAlert> : null}
 
       {!result && apiLoading ? (
         <div className="space-y-4">

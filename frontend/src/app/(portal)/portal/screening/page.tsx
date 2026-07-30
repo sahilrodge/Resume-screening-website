@@ -1,9 +1,12 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { Download } from "lucide-react"
+import { Download, Sparkles } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { EmptyState } from "@/components/shared/empty-state"
+import { InlineAlert } from "@/components/shared/inline-alert"
+import { PageHeader } from "@/components/shared/page-header"
 import { PageSkeleton } from "@/components/shared/page-skeleton"
 import { useCandidateSync } from "@/features/candidate/candidate-sync-provider"
 import { applicationsApi } from "@/services/applications"
@@ -38,26 +41,21 @@ export default function PortalScreeningPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <header className="space-y-1">
-        <h1 className="font-heading text-2xl font-semibold tracking-tight">
-          Resume AI Screening
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Match scores, ATS scores, skill gaps, and suggestions for your applications.
-        </p>
-      </header>
+      <PageHeader
+        title="Resume AI Screening"
+        description="Match scores, ATS scores, skill gaps, and suggestions for your applications."
+      />
 
       {loading ? <PageSkeleton withHeader={false} rows={4} /> : null}
       {displayError ? (
-        <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
-          {displayError}
-        </p>
+        <InlineAlert variant="error">{displayError}</InlineAlert>
       ) : null}
       {!loading && !displayError && items.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          No screening results yet. Apply to open roles or wait for a recruiter to
-          screen your resume.
-        </p>
+        <EmptyState
+          icon={Sparkles}
+          title="No screening results yet"
+          description="Apply to open roles or wait for a recruiter to screen your resume."
+        />
       ) : null}
 
       <ul className="divide-y divide-border">

@@ -4,6 +4,9 @@ import { useState } from "react"
 import { Bell } from "lucide-react"
 
 import { notificationsApi } from "@/services/notifications"
+import { EmptyState } from "@/components/shared/empty-state"
+import { InlineAlert } from "@/components/shared/inline-alert"
+import { PageHeader } from "@/components/shared/page-header"
 import { PageSkeleton } from "@/components/shared/page-skeleton"
 import { Button } from "@/components/ui/button"
 import { useCandidateSync } from "@/features/candidate/candidate-sync-provider"
@@ -46,39 +49,36 @@ export default function PortalNotificationsPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="space-y-1">
-          <h1 className="font-heading text-2xl font-semibold tracking-tight">
-            Notifications
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            {unreadCount > 0 ? `${unreadCount} unread` : "You're all caught up"}
-          </p>
-        </div>
-        {unreadCount > 0 ? (
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full sm:w-auto"
-            onClick={() => void markAll()}
-          >
-            Mark all read
-          </Button>
-        ) : null}
-      </header>
+      <PageHeader
+        title="Notifications"
+        description={
+          unreadCount > 0 ? `${unreadCount} unread` : "You're all caught up"
+        }
+        actions={
+          unreadCount > 0 ? (
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full sm:w-auto"
+              onClick={() => void markAll()}
+            >
+              Mark all read
+            </Button>
+          ) : null
+        }
+      />
 
       {loading ? <PageSkeleton withHeader={false} rows={5} /> : null}
       {displayError ? (
-        <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
-          {displayError}
-        </p>
+        <InlineAlert variant="error">{displayError}</InlineAlert>
       ) : null}
 
       {!loading && notifications.length === 0 ? (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Bell className="size-4" />
-          No notifications yet.
-        </div>
+        <EmptyState
+          icon={Bell}
+          title="No notifications yet"
+          description="Updates about applications and screening will show up here."
+        />
       ) : null}
 
       <ul className="divide-y divide-border">

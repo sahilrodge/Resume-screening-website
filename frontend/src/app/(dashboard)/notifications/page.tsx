@@ -13,7 +13,10 @@ import {
 
 import { StatusBadge } from "@/components/admin/status-badge"
 import { FadeIn, PageTransition } from "@/components/motion/page-transition"
+import { EmptyState } from "@/components/shared/empty-state"
+import { InlineAlert } from "@/components/shared/inline-alert"
 import { PageHeader } from "@/components/shared/page-header"
+import { CardSkeleton } from "@/components/shared/page-skeleton"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { useAuth } from "@/features/auth/auth-provider"
@@ -161,24 +164,33 @@ export default function NotificationsPage() {
 
       {error ? (
         <FadeIn>
-          <Card className="border-destructive/40 bg-destructive/5 shadow-none">
-            <CardContent className="py-4 text-sm text-destructive">{error}</CardContent>
-          </Card>
+          <InlineAlert variant="error">{error}</InlineAlert>
         </FadeIn>
       ) : null}
 
       <div className="space-y-3">
-        {!loading && items.length === 0 ? (
+        {loading ? (
           <FadeIn>
-            <Card className="border-border/70 bg-card/80 shadow-none">
-              <CardContent className="py-10 text-center text-sm text-muted-foreground">
-                No notifications yet. Hiring events and the test button will appear here.
-              </CardContent>
-            </Card>
+            <div className="space-y-3">
+              <CardSkeleton />
+              <CardSkeleton />
+              <CardSkeleton />
+            </div>
           </FadeIn>
         ) : null}
 
-        {items.map((item, index) => {
+        {!loading && items.length === 0 ? (
+          <FadeIn>
+            <EmptyState
+              icon={Bell}
+              title="No notifications yet"
+              description="Hiring events and the test button will appear here."
+            />
+          </FadeIn>
+        ) : null}
+
+        {!loading
+          ? items.map((item, index) => {
           const Icon = channelIcon(item.channel)
           const body = (
             <Card
@@ -237,7 +249,8 @@ export default function NotificationsPage() {
               )}
             </motion.div>
           )
-        })}
+        })
+          : null}
       </div>
     </PageTransition>
   )

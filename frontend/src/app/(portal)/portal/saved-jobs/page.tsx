@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react"
 import Link from "next/link"
-import { BookmarkX, Search } from "lucide-react"
+import { Bookmark, BookmarkX, Search } from "lucide-react"
 
 import { applicationsApi } from "@/services/applications"
 import { jobsApi } from "@/services/jobs"
@@ -26,6 +26,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { EmptyState } from "@/components/shared/empty-state"
+import { InlineAlert } from "@/components/shared/inline-alert"
+import { PageHeader } from "@/components/shared/page-header"
 import { PageSkeleton } from "@/components/shared/page-skeleton"
 import { useCandidateSync } from "@/features/candidate/candidate-sync-provider"
 import {
@@ -126,25 +129,21 @@ export default function SavedJobsPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-8">
-      <header className="space-y-1">
-        <h1 className="font-heading text-2xl font-semibold tracking-tight">
-          Saved Jobs
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Roles you bookmarked — remove, search, filter, or apply when ready.
-        </p>
-      </header>
+      <PageHeader
+        title="Saved Jobs"
+        description="Roles you bookmarked — remove, search, filter, or apply when ready."
+      />
 
       {!loading && !hasResume ? (
-        <p className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm">
+        <InlineAlert variant="info">
           Upload a resume before you can apply.{" "}
           <Link
             href="/portal/profile"
-            className="font-medium text-primary underline"
+            className="font-medium underline"
           >
             Go to profile
           </Link>
-        </p>
+        </InlineAlert>
       ) : null}
 
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
@@ -197,9 +196,7 @@ export default function SavedJobsPage() {
 
       {loading ? <PageSkeleton withHeader={false} rows={4} /> : null}
       {displayError ? (
-        <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
-          {displayError}
-        </p>
+        <InlineAlert variant="error">{displayError}</InlineAlert>
       ) : null}
 
       {!loading ? (
@@ -214,21 +211,29 @@ export default function SavedJobsPage() {
 
       <section className="space-y-3">
         {filteredJobs.length === 0 && !loading ? (
-          <div className="space-y-2 py-6 text-sm text-muted-foreground">
-            <p>
-              {savedJobs.length === 0
-                ? "No saved jobs yet. Browse open roles and tap Save."
-                : "No saved jobs match your search or filters."}
-            </p>
-            {savedJobs.length === 0 ? (
-              <Link
-                href="/portal/jobs"
-                className={buttonVariants({ variant: "outline", size: "sm" })}
-              >
-                Browse jobs
-              </Link>
-            ) : null}
-          </div>
+          <EmptyState
+            icon={Bookmark}
+            title={
+              savedJobs.length === 0
+                ? "No saved jobs yet"
+                : "No matching saved jobs"
+            }
+            description={
+              savedJobs.length === 0
+                ? "Browse open roles and tap Save to bookmark them here."
+                : "Try a different search or clear your filters."
+            }
+            action={
+              savedJobs.length === 0 ? (
+                <Link
+                  href="/portal/jobs"
+                  className={buttonVariants({ variant: "outline", size: "sm" })}
+                >
+                  Browse jobs
+                </Link>
+              ) : null
+            }
+          />
         ) : null}
 
         <ul className="divide-y divide-border">

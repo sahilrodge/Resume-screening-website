@@ -71,6 +71,7 @@ export function AppNavbar() {
   const candidateSync = useCandidateSyncOptional()
   const meta = getNavMeta(pathname, user?.role)
   const searchListId = useId()
+  const mobileSearchListId = useId()
 
   const [unread, setUnread] = useState(0)
   const [search, setSearch] = useState("")
@@ -526,38 +527,40 @@ export function AppNavbar() {
                 </p>
               ) : null}
               {notifications.map((item) => (
-                <button
+                <div
                   key={item.id}
-                  type="button"
                   className={cn(
-                    "flex w-full flex-col gap-0.5 border-b border-border/70 px-3 py-2.5 text-left transition-colors last:border-b-0 hover:bg-accent/70",
+                    "flex w-full flex-col gap-0.5 border-b border-border/70 px-3 py-2.5 text-left last:border-b-0",
                     !item.is_read && "bg-primary/5"
                   )}
-                  onClick={() => onNotificationClick(item)}
                 >
-                  <div className="flex items-start justify-between gap-2">
-                    <span className="text-sm font-medium leading-snug">
-                      {item.title}
+                  <button
+                    type="button"
+                    className="flex w-full flex-col gap-0.5 rounded-md text-left transition-colors hover:bg-accent/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                    onClick={() => onNotificationClick(item)}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="text-sm font-medium leading-snug">
+                        {item.title}
+                      </span>
+                      <span className="shrink-0 text-[10px] text-muted-foreground">
+                        {formatRelativeTime(item.created_at)}
+                      </span>
+                    </div>
+                    <span className="line-clamp-2 text-xs text-muted-foreground">
+                      {item.message}
                     </span>
-                    <span className="shrink-0 text-[10px] text-muted-foreground">
-                      {formatRelativeTime(item.created_at)}
-                    </span>
-                  </div>
-                  <span className="line-clamp-2 text-xs text-muted-foreground">
-                    {item.message}
-                  </span>
+                  </button>
                   {!item.is_read ? (
-                    <span
-                      className="mt-1 text-[11px] font-medium text-primary"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        void onMarkRead(item.id)
-                      }}
+                    <button
+                      type="button"
+                      className="mt-1 self-start text-[11px] font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                      onClick={() => void onMarkRead(item.id)}
                     >
                       Mark as read
-                    </span>
+                    </button>
                   ) : null}
-                </button>
+                </div>
               ))}
             </div>
 
@@ -714,10 +717,18 @@ export function AppNavbar() {
               placeholder="Search jobs…"
               className="h-8 bg-muted/40 pl-8"
               aria-label="Search jobs"
+              aria-autocomplete="list"
+              aria-controls={mobileSearchListId}
+              aria-expanded={searchOpen}
+              role="combobox"
             />
           </form>
           {searchOpen && search.trim().length >= 2 ? (
-            <div className="absolute top-[calc(100%+6px)] right-0 left-0 z-50 overflow-hidden rounded-xl border border-border bg-popover text-popover-foreground shadow-lg">
+            <div
+              id={mobileSearchListId}
+              role="listbox"
+              className="absolute top-[calc(100%+6px)] right-0 left-0 z-50 overflow-hidden rounded-xl border border-border bg-popover text-popover-foreground shadow-lg"
+            >
               {searchLoading ? (
                 <p className="px-3 py-3 text-sm text-muted-foreground">Searching…</p>
               ) : null}

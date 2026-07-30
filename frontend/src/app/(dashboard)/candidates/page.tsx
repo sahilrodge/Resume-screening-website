@@ -10,13 +10,17 @@ import {
   Plus,
   RefreshCw,
   Trash2,
+  Users,
 } from "lucide-react"
 import Link from "next/link"
 
 import { AdminTableShell } from "@/components/admin/admin-table-shell"
 import { StatusBadge } from "@/components/admin/status-badge"
 import { FadeIn, PageTransition } from "@/components/motion/page-transition"
+import { EmptyState } from "@/components/shared/empty-state"
+import { InlineAlert } from "@/components/shared/inline-alert"
 import { PageHeader } from "@/components/shared/page-header"
+import { TableSkeleton } from "@/components/shared/page-skeleton"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -269,9 +273,7 @@ export default function CandidatesPage() {
 
       {error ? (
         <FadeIn>
-          <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
-            {error}
-          </p>
+          <InlineAlert variant="error">{error}</InlineAlert>
         </FadeIn>
       ) : null}
 
@@ -358,138 +360,148 @@ export default function CandidatesPage() {
             </div>
           }
         >
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>
-                  <button
-                    type="button"
-                    className="font-medium"
-                    onClick={() => toggleSort("full_name")}
-                  >
-                    Name
-                  </button>
-                </TableHead>
-                <TableHead className="hidden md:table-cell">
-                  <button
-                    type="button"
-                    className="font-medium"
-                    onClick={() => toggleSort("current_title")}
-                  >
-                    Title
-                  </button>
-                </TableHead>
-                <TableHead className="hidden lg:table-cell">
-                  <button
-                    type="button"
-                    className="font-medium"
-                    onClick={() => toggleSort("location")}
-                  >
-                    Location
-                  </button>
-                </TableHead>
-                <TableHead className="hidden sm:table-cell">
-                  <button
-                    type="button"
-                    className="font-medium"
-                    onClick={() => toggleSort("years_experience")}
-                  >
-                    Exp
-                  </button>
-                </TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {items.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                    {loading ? "Loading candidates..." : "No candidates found"}
-                  </TableCell>
-                </TableRow>
-              ) : (
-                items.map((row) => (
-                  <TableRow key={row.id} className="transition-colors hover:bg-muted/40">
-                    <TableCell>
-                      <Link href={`/candidates/${row.id}`} className="block hover:underline">
-                        <div className="font-medium">{row.full_name}</div>
-                        <div className="text-xs text-muted-foreground">{row.email}</div>
-                      </Link>
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell">
-                      <div>{row.current_title || "—"}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {row.headline || "No headline"}
-                      </div>
-                    </TableCell>
-                    <TableCell className="hidden text-muted-foreground lg:table-cell">
-                      {row.location || "—"}
-                    </TableCell>
-                    <TableCell className="hidden sm:table-cell">
-                      {row.years_experience ?? "—"}
-                    </TableCell>
-                    <TableCell>
-                      <StatusBadge status={row.is_active ? "Active" : "Inactive"} />
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        <Link
-                          href={`/candidates/${row.id}`}
-                          className={buttonVariants({ variant: "ghost", size: "icon-sm" })}
-                          aria-label="View profile"
-                        >
-                          <Eye />
-                        </Link>
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          onClick={() => openEdit(row)}
-                          aria-label="Edit"
-                        >
-                          <Pencil />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          onClick={() => void handleDelete(row)}
-                          aria-label="Delete"
-                        >
-                          <Trash2 />
-                        </Button>
-                      </div>
-                    </TableCell>
+          {loading && items.length === 0 ? (
+            <TableSkeleton cols={6} />
+          ) : items.length === 0 ? (
+            <EmptyState
+              icon={Users}
+              title="No candidates found"
+              description="Adjust filters, or add a candidate profile to get started."
+              action={
+                <Button onClick={openCreate}>
+                  <Plus data-icon="inline-start" />
+                  Add candidate
+                </Button>
+              }
+            />
+          ) : (
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>
+                      <button
+                        type="button"
+                        className="font-medium"
+                        onClick={() => toggleSort("full_name")}
+                      >
+                        Name
+                      </button>
+                    </TableHead>
+                    <TableHead className="hidden md:table-cell">
+                      <button
+                        type="button"
+                        className="font-medium"
+                        onClick={() => toggleSort("current_title")}
+                      >
+                        Title
+                      </button>
+                    </TableHead>
+                    <TableHead className="hidden lg:table-cell">
+                      <button
+                        type="button"
+                        className="font-medium"
+                        onClick={() => toggleSort("location")}
+                      >
+                        Location
+                      </button>
+                    </TableHead>
+                    <TableHead className="hidden sm:table-cell">
+                      <button
+                        type="button"
+                        className="font-medium"
+                        onClick={() => toggleSort("years_experience")}
+                      >
+                        Exp
+                      </button>
+                    </TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                </TableHeader>
+                <TableBody>
+                  {items.map((row) => (
+                    <TableRow key={row.id} className="transition-colors hover:bg-muted/40">
+                      <TableCell>
+                        <Link href={`/candidates/${row.id}`} className="block hover:underline">
+                          <div className="font-medium">{row.full_name}</div>
+                          <div className="text-xs text-muted-foreground">{row.email}</div>
+                        </Link>
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell">
+                        <div>{row.current_title || "—"}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {row.headline || "No headline"}
+                        </div>
+                      </TableCell>
+                      <TableCell className="hidden text-muted-foreground lg:table-cell">
+                        {row.location || "—"}
+                      </TableCell>
+                      <TableCell className="hidden sm:table-cell">
+                        {row.years_experience ?? "—"}
+                      </TableCell>
+                      <TableCell>
+                        <StatusBadge status={row.is_active ? "Active" : "Inactive"} />
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          <Link
+                            href={`/candidates/${row.id}`}
+                            className={buttonVariants({ variant: "ghost", size: "icon-sm" })}
+                            aria-label="View profile"
+                          >
+                            <Eye />
+                          </Link>
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={() => openEdit(row)}
+                            aria-label="Edit"
+                          >
+                            <Pencil />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={() => void handleDelete(row)}
+                            aria-label="Delete"
+                          >
+                            <Trash2 />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
 
-          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm text-muted-foreground">
-              Page {page} of {Math.max(pages, 1)} · {total} total
-            </p>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page <= 1}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-              >
-                <ChevronLeft data-icon="inline-start" />
-                Prev
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={pages === 0 || page >= pages}
-                onClick={() => setPage((p) => p + 1)}
-              >
-                Next
-                <ChevronRight data-icon="inline-end" />
-              </Button>
-            </div>
-          </div>
+              <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm text-muted-foreground">
+                  Page {page} of {Math.max(pages, 1)} · {total} total
+                </p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={page <= 1}
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  >
+                    <ChevronLeft data-icon="inline-start" />
+                    Prev
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={pages === 0 || page >= pages}
+                    onClick={() => setPage((p) => p + 1)}
+                  >
+                    Next
+                    <ChevronRight data-icon="inline-end" />
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
         </AdminTableShell>
       </FadeIn>
 

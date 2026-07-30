@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
-import { Bookmark, BookmarkCheck } from "lucide-react"
+import { Bookmark, BookmarkCheck, Briefcase } from "lucide-react"
 
 import { applicationsApi } from "@/services/applications"
 import { jobsApi } from "@/services/jobs"
@@ -18,6 +18,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { EmptyState } from "@/components/shared/empty-state"
+import { InlineAlert } from "@/components/shared/inline-alert"
+import { PageHeader } from "@/components/shared/page-header"
 import { PageSkeleton } from "@/components/shared/page-skeleton"
 import { useCandidateSync } from "@/features/candidate/candidate-sync-provider"
 import {
@@ -137,33 +140,33 @@ function PortalJobsContent() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-8">
-      <header className="space-y-1">
-        <h1 className="font-heading text-2xl font-semibold tracking-tight">Jobs</h1>
-        <p className="text-sm text-muted-foreground">
-          Browse open roles, save jobs, and track your applications.
-        </p>
-      </header>
+      <PageHeader
+        title="Jobs"
+        description="Browse open roles, save jobs, and track your applications."
+      />
 
       {!loading && !hasResume ? (
-        <p className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm">
+        <InlineAlert variant="info">
           Upload a resume before you can apply.{" "}
-          <Link href="/portal/profile" className="font-medium text-primary underline">
+          <Link href="/portal/profile" className="font-medium underline">
             Go to profile
           </Link>
-        </p>
+        </InlineAlert>
       ) : null}
 
       {loading ? <PageSkeleton withHeader={false} rows={4} /> : null}
       {displayError ? (
-        <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
-          {displayError}
-        </p>
+        <InlineAlert variant="error">{displayError}</InlineAlert>
       ) : null}
 
       <section className="space-y-3">
         <h2 className="text-sm font-medium">Your applications</h2>
         {applications.length === 0 && !loading ? (
-          <p className="text-sm text-muted-foreground">No applications yet.</p>
+          <EmptyState
+            icon={Briefcase}
+            title="No applications yet"
+            description="Apply to an open role below to track status and match scores here."
+          />
         ) : null}
         <ul className="divide-y divide-border">
           {applications.map((app) => (
@@ -201,9 +204,15 @@ function PortalJobsContent() {
           ) : null}
         </div>
         {filteredJobs.length === 0 && !loading ? (
-          <p className="text-sm text-muted-foreground">
-            {query ? "No jobs match your search." : "No open jobs right now."}
-          </p>
+          <EmptyState
+            icon={Briefcase}
+            title={query ? "No matching jobs" : "No open jobs"}
+            description={
+              query
+                ? "Try a different search, or clear filters to see all open roles."
+                : "Check back soon — new roles will show up here when published."
+            }
+          />
         ) : null}
         <ul className="divide-y divide-border">
           {filteredJobs.map((job) => {

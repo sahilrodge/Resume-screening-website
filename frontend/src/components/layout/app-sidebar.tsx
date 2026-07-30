@@ -61,7 +61,7 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader className="border-b border-sidebar-border px-3 py-4">
+      <SidebarHeader className="border-b border-sidebar-border px-3 py-4 md:pr-3 pr-12">
         <Link
           href={homeHref}
           onClick={closeMobileSidebar}

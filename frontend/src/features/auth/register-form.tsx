@@ -4,6 +4,7 @@ import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 
+import { InlineAlert } from "@/components/shared/inline-alert"
 import { useAuth } from "@/features/auth/auth-provider"
 import { homeForRole } from "@/lib/auth-roles"
 import { ApiError } from "@/types/api"
@@ -27,6 +28,11 @@ export function RegisterForm() {
     event.preventDefault()
     setError(null)
 
+    if (!fullName.trim() || !email.trim() || !password || !confirmPassword) {
+      setError("Please fill in all fields.")
+      return
+    }
+
     if (password !== confirmPassword) {
       setError("Passwords do not match")
       return
@@ -48,12 +54,15 @@ export function RegisterForm() {
     }
   }
 
+  const passwordsMismatch =
+    confirmPassword.length > 0 && password !== confirmPassword
+
   return (
-    <form onSubmit={onSubmit} className="space-y-4">
-      <p className="rounded-lg border border-border/70 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-        Public signup creates a <span className="font-medium text-foreground">Candidate</span>{" "}
+    <form onSubmit={onSubmit} className="space-y-4" noValidate>
+      <InlineAlert variant="info">
+        Public signup creates a <span className="font-medium">Candidate</span>{" "}
         account. Recruiter and Admin accounts are invited by an administrator.
-      </p>
+      </InlineAlert>
 
       <div className="space-y-2">
         <Label htmlFor="full_name">Name</Label>
@@ -63,6 +72,7 @@ export function RegisterForm() {
           value={fullName}
           onChange={(e) => setFullName(e.target.value)}
           placeholder="Jane Doe"
+          aria-invalid={error && !fullName.trim() ? true : undefined}
         />
       </div>
 
@@ -93,6 +103,7 @@ export function RegisterForm() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           placeholder={PASSWORD_HINT}
+          aria-describedby="password-hint"
         />
       </div>
 
@@ -108,16 +119,15 @@ export function RegisterForm() {
           value={confirmPassword}
           onChange={(e) => setConfirmPassword(e.target.value)}
           placeholder="Re-enter password"
+          aria-invalid={passwordsMismatch || undefined}
         />
       </div>
 
-      <p className="text-xs text-muted-foreground">{PASSWORD_HINT}</p>
+      <p id="password-hint" className="text-xs text-muted-foreground">
+        {PASSWORD_HINT}
+      </p>
 
-      {error ? (
-        <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
-          {error}
-        </p>
-      ) : null}
+      {error ? <InlineAlert variant="error">{error}</InlineAlert> : null}
 
       <Button type="submit" className="w-full" disabled={submitting}>
         {submitting ? "Creating account…" : "Create candidate account"}
@@ -125,7 +135,10 @@ export function RegisterForm() {
 
       <p className="text-center text-sm text-muted-foreground">
         Already have an account?{" "}
-        <Link href="/login" className="font-medium text-foreground underline-offset-4 hover:underline">
+        <Link
+          href="/login"
+          className="font-medium text-foreground underline-offset-4 hover:underline"
+        >
           Sign in
         </Link>
       </p>

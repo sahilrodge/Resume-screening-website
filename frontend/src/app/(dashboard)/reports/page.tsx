@@ -4,7 +4,9 @@ import { useEffect, useMemo, useState } from "react"
 import { Download } from "lucide-react"
 
 import { FadeIn, PageTransition } from "@/components/motion/page-transition"
+import { InlineAlert } from "@/components/shared/inline-alert"
 import { PageHeader } from "@/components/shared/page-header"
+import { CardSkeleton } from "@/components/shared/page-skeleton"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -148,21 +150,23 @@ export default function ReportsPage() {
       </FadeIn>
 
       {loading ? (
-        <p className="text-sm text-muted-foreground">Loading reports…</p>
+        <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <CardSkeleton />
+          <CardSkeleton />
+          <CardSkeleton />
+          <CardSkeleton />
+        </div>
       ) : null}
-      {error ? (
-        <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
-          {error}
-        </p>
-      ) : null}
+      {error ? <InlineAlert variant="error">{error}</InlineAlert> : null}
 
+      {!loading ? (
       <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {cards.map((card) => (
           <FadeIn key={card.title}>
             <Card>
               <CardHeader className="pb-2">
                 <CardDescription>{card.title}</CardDescription>
-                <CardTitle className="text-3xl tabular-nums">
+                <CardTitle className="font-heading text-3xl tabular-nums">
                   {card.value ?? "—"}
                 </CardTitle>
               </CardHeader>
@@ -173,12 +177,13 @@ export default function ReportsPage() {
           </FadeIn>
         ))}
       </div>
+      ) : null}
 
       {data?.hiring_funnel?.stages?.length ? (
         <FadeIn>
           <Card className="mt-6">
             <CardHeader>
-              <CardTitle>Pipeline funnel</CardTitle>
+              <CardTitle className="font-heading">Pipeline funnel</CardTitle>
               <CardDescription>Application status distribution</CardDescription>
             </CardHeader>
             <CardContent>
@@ -202,7 +207,7 @@ export default function ReportsPage() {
         <FadeIn>
           <Card className="mt-6">
             <CardHeader>
-              <CardTitle>Job performance</CardTitle>
+              <CardTitle className="font-heading">Job performance</CardTitle>
               <CardDescription>Applications and hires by role</CardDescription>
             </CardHeader>
             <CardContent>
