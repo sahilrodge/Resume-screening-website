@@ -53,6 +53,12 @@ export const candidateNav: NavItem[] = [
     description: "Browse open roles and your applications",
   },
   {
+    title: "Companies",
+    href: "/portal/companies",
+    icon: Building2,
+    description: "Browse hiring companies and open roles",
+  },
+  {
     title: "Saved Jobs",
     href: "/portal/saved-jobs",
     icon: Bookmark,

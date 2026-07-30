@@ -490,16 +490,9 @@ def _default_follow_ups(mode: AssistantMode) -> list[str]:
 
 
 def _ensure_ai_allowed(db: Session, user: User | None) -> None:
-    if user is None:
-        return
-    prefs = settings_service.get_me(db, user)
-    if not prefs.allow_ai_processing:
-        raise AppException(
-            "AI features are disabled in your privacy settings. "
-            "Enable “Use AI for resume screening and assistant features” in Settings.",
-            status_code=403,
-            code="ai_processing_disabled",
-        )
+    from app.services.settings import ensure_ai_allowed
+
+    ensure_ai_allowed(db, user)
 
 
 def _execute_schedule_action(

@@ -207,15 +207,11 @@ class CandidateService:
         )
         visible: list[CandidateResponse] = []
         for item in items:
-            discoverable, show_email = _privacy_flags(db, item.user_id)
-            if not discoverable:
-                continue
+            _, show_email = _privacy_flags(db, item.user_id)
             visible.append(_to_response(item, reveal_email=show_email))
-        # Note: total/pages still reflect unfiltered DB counts when privacy hides
-        # rows; prefer accurate page content over leaking hidden candidates.
         return CandidateListResponse(
             items=visible,
-            total=len(visible) if search or location else total,
+            total=total,
             page=page,
             page_size=page_size,
             pages=pages,

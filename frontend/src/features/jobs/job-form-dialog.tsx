@@ -92,9 +92,15 @@ export function JobFormDialog({
     try {
       const data = await companiesApi.list()
       setCompanies(data.items)
+      setCompanyError(null)
       return data.items
-    } catch {
+    } catch (err) {
       setCompanies([])
+      setCompanyError(
+        err instanceof ApiError
+          ? err.message
+          : "Could not load companies. Try again."
+      )
       return []
     }
   }

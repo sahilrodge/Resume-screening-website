@@ -27,12 +27,20 @@ from app.schemas.application import (
 )
 from app.services.notification import notification_service
 from app.services.resume import resume_service
+from app.services.settings import ensure_ai_allowed
 
 
 def _as_str_list(value: object) -> list[str]:
     if not isinstance(value, list):
         return []
     return [str(s).strip() for s in value if str(s).strip()]
+
+
+def _resume_owner_user(resume) -> object | None:
+    candidate = getattr(resume, "candidate", None)
+    if candidate is None:
+        return None
+    return getattr(candidate, "user", None)
 
 
 def _score_fingerprint(*, resume, job) -> str:
@@ -110,6 +118,9 @@ class ApplicationService:
         # Auto re-extract / re-parse failed uploads before matching.
         # Cached parsed_data is reused when the resume is already PARSED.
         resume = resume_service.ensure_ready(db, resume_id=resume.id)
+
+        # Honor resume owner's privacy toggle before any AI/local scoring.
+        ensure_ai_allowed(db, _resume_owner_user(resume))
 
         if (
             resume.status != ResumeStatus.PARSED

@@ -96,22 +96,34 @@ export default function NotificationsPage() {
   }, [loading, unread, items.length])
 
   async function markAllRead() {
-    await notificationsApi.markAllRead()
-    await load()
+    try {
+      await notificationsApi.markAllRead()
+      await load()
+    } catch {
+      setError("Could not mark notifications as read.")
+    }
   }
 
   async function toggleRead(item: AppNotification) {
-    await notificationsApi.markRead(item.id, !item.is_read)
-    await load()
+    try {
+      await notificationsApi.markRead(item.id, !item.is_read)
+      await load()
+    } catch {
+      setError("Could not update notification.")
+    }
   }
 
   async function sendTest() {
-    await notificationsApi.test({
-      title: "Test notification",
-      message: "HirePulse notification channels are working.",
-      channels: ["in_app", "email", "push"],
-    })
-    await load()
+    try {
+      await notificationsApi.test({
+        title: "Test notification",
+        message: "HirePulse notification channels are working.",
+        channels: ["in_app", "email", "push"],
+      })
+      await load()
+    } catch {
+      setError("Could not send test notification.")
+    }
   }
 
   return (

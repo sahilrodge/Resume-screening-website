@@ -7,7 +7,7 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.exceptions import UnauthorizedError
+from app.core.exceptions import AppException, UnauthorizedError
 from app.core.security import verify_password
 from app.core.super_admin import protect_super_admin
 from app.crud.refresh_token import refresh_token as refresh_token_crud
@@ -27,6 +27,21 @@ def _get_or_create(db: Session, user_id: uuid.UUID) -> UserSettings:
     db.commit()
     db.refresh(settings)
     return settings
+
+
+def ensure_ai_allowed(db: Session, user: User | None) -> None:
+    """Raise if the user has disabled AI processing in privacy settings."""
+    if user is None:
+        return
+    prefs = _get_or_create(db, user.id)
+    if not prefs.allow_ai_processing:
+        raise AppException(
+            "AI features are disabled in your privacy settings. "
+            "Enable “Allow AI processing” in Settings to use resume screening "
+            "and assistant features.",
+            status_code=403,
+            code="ai_processing_disabled",
+        )
 
 
 class SettingsService:

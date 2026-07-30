@@ -14,6 +14,7 @@ from app.models.candidate import Candidate
 from app.models.enums import UserRole
 from app.models.skill import CandidateSkill
 from app.models.user import User
+from app.models.user_settings import UserSettings
 from app.schemas.candidate import (
     CandidateCreate,
     CandidateSortField,
@@ -175,7 +176,20 @@ class CRUDCandidate:
         if is_active is not None:
             filters.append(User.is_active.is_(is_active))
 
-        count_stmt = select(func.count()).select_from(Candidate).join(User)
+        # Hide candidates who opted out of discoverability (default = discoverable
+        # when no settings row exists).
+        discoverable_clause = or_(
+            UserSettings.id.is_(None),
+            UserSettings.profile_discoverable.is_(True),
+        )
+
+        count_stmt = (
+            select(func.count())
+            .select_from(Candidate)
+            .join(User)
+            .outerjoin(UserSettings, UserSettings.user_id == User.id)
+            .where(discoverable_clause)
+        )
         if filters:
             count_stmt = count_stmt.where(*filters)
         total = db.scalar(count_stmt) or 0
@@ -191,7 +205,9 @@ class CRUDCandidate:
         sort_col = sort_map[sort_by]
         order_expr = asc(sort_col) if sort_order == "asc" else desc(sort_col)
 
-        stmt = _base_query()
+        stmt = _base_query().outerjoin(
+            UserSettings, UserSettings.user_id == User.id
+        ).where(discoverable_clause)
         if filters:
             stmt = stmt.where(*filters)
         stmt = (

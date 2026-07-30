@@ -724,7 +724,8 @@ export function SettingsPageClient({
               <CardHeader>
                 <CardTitle className="font-heading text-base">Language</CardTitle>
                 <CardDescription>
-                  Preferred interface language
+                  Preferred language (saved for your account; the UI is English
+                  for now)
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -801,7 +802,7 @@ export function SettingsPageClient({
                     [
                       "share_activity_status",
                       "Share activity status",
-                      "Show recent activity signals where supported",
+                      "Saved for future activity signals (not shown elsewhere yet)",
                     ],
                   ] as const
                 ).map(([key, label, note]) => (
