@@ -50,7 +50,7 @@ export type ComparePayload = {
 
 export const APPLICATION_STATUS_LABELS: Record<ApplicationStatus, string> = {
   applied: "Applied",
-  screening: "Screening",
+  screening: "Under Review",
   shortlisted: "Shortlisted",
   interview: "Interview",
   offered: "Offered",

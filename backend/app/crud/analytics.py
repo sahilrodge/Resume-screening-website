@@ -32,7 +32,7 @@ FUNNEL_ORDER = [
 
 STATUS_LABELS = {
     ApplicationStatus.APPLIED: "Applied",
-    ApplicationStatus.SCREENING: "Screening",
+    ApplicationStatus.SCREENING: "Under Review",
     ApplicationStatus.SHORTLISTED: "Shortlisted",
     ApplicationStatus.INTERVIEW: "Interview",
     ApplicationStatus.OFFERED: "Offered",

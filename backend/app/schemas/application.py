@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.models.enums import ApplicationStatus
 
@@ -25,6 +25,19 @@ class ApplicationApplyRequest(BaseModel):
 
 class ApplicationStatusUpdate(BaseModel):
     status: ApplicationStatus
+
+    @field_validator("status", mode="before")
+    @classmethod
+    def normalize_status(cls, value: object) -> object:
+        if isinstance(value, str):
+            key = value.strip().lower().replace(" ", "_")
+            aliases = {
+                "under_review": ApplicationStatus.SCREENING.value,
+                "select": ApplicationStatus.SELECTED.value,
+                "reject": ApplicationStatus.REJECTED.value,
+            }
+            return aliases.get(key, key)
+        return value
 
 
 class ApplicationResponse(BaseModel):

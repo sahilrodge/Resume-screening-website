@@ -27,12 +27,15 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { MatchResultPanel } from "@/features/screening/match-result-panel"
+import { CandidateDecisionActions } from "@/features/screening/candidate-decision-actions"
+import { StatusBadge } from "@/components/admin/status-badge"
 import { useApiLoading } from "@/hooks/use-api-loading"
 import { applicationsApi } from "@/services/applications"
 import { jobsApi } from "@/services/jobs"
 import { resumesApi } from "@/services/resumes"
 import { ApiError } from "@/types/api"
 import type { ApplicationMatch } from "@/types/application"
+import { APPLICATION_STATUS_LABELS } from "@/types/application"
 import type { Job } from "@/types/job"
 import type { Resume } from "@/types/resume"
 
@@ -393,7 +396,29 @@ export default function ScreeningPageClient() {
 
       {result ? (
         <FadeIn>
-          <MatchResultPanel result={result} />
+          <div className="space-y-4">
+            <MatchResultPanel result={result} />
+            <section className="space-y-3 rounded-2xl border border-border/70 bg-card/80 p-5">
+              <div>
+                <h2 className="font-heading text-base font-semibold">
+                  Candidate decision
+                </h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Select or reject this candidate. Confirmation is required before
+                  the application status is updated.
+                </p>
+              </div>
+              <CandidateDecisionActions
+                application={result}
+                onUpdated={(updated) => {
+                  setResult(updated)
+                  setHistory((current) =>
+                    current.map((row) => (row.id === updated.id ? updated : row))
+                  )
+                }}
+              />
+            </section>
+          </div>
         </FadeIn>
       ) : null}
 
@@ -407,6 +432,7 @@ export default function ScreeningPageClient() {
               <TableRow>
                 <TableHead>Candidate</TableHead>
                 <TableHead className="hidden lg:table-cell">Job</TableHead>
+                <TableHead>Status</TableHead>
                 <TableHead>ATS Score</TableHead>
                 <TableHead className="hidden md:table-cell">
                   Missing Skills
@@ -424,7 +450,7 @@ export default function ScreeningPageClient() {
               {screenedHistory.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={7}
+                    colSpan={8}
                     className="h-24 text-center text-muted-foreground"
                   >
                     {loading
@@ -447,6 +473,19 @@ export default function ScreeningPageClient() {
                       <div className="truncate font-medium" title={formatJobLabelFromMatch(row)}>
                         {formatJobLabelFromMatch(row)}
                       </div>
+                    </TableCell>
+                    <TableCell>
+                      <StatusBadge
+                        status={
+                          row.status === "selected" ||
+                          row.status === "hired" ||
+                          row.status === "offered"
+                            ? "Selected"
+                            : row.status === "rejected"
+                              ? "Rejected"
+                              : APPLICATION_STATUS_LABELS[row.status]
+                        }
+                      />
                     </TableCell>
                     <TableCell className="font-semibold tabular-nums">
                       {formatScore(row.ats_score ?? row.match_score)}
