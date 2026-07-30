@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.models.enums import InterviewStatus, InterviewType
 
@@ -21,6 +22,26 @@ class InterviewCreate(BaseModel):
 
 class InterviewStatusUpdate(BaseModel):
     status: InterviewStatus
+
+    @field_validator("status", mode="before")
+    @classmethod
+    def normalize_status(cls, value: object) -> object:
+        if isinstance(value, str):
+            key = value.strip().lower().replace(" ", "_")
+            aliases = {
+                "no-show": InterviewStatus.NO_SHOW.value,
+                "noshow": InterviewStatus.NO_SHOW.value,
+            }
+            return aliases.get(key, key)
+        return value
+
+
+class InterviewTimelineStep(BaseModel):
+    key: str
+    label: str
+    completed: bool
+    current: bool = False
+    at: datetime | None = None
 
 
 class InterviewResponse(BaseModel):
@@ -39,6 +60,9 @@ class InterviewResponse(BaseModel):
     duration_minutes: int
     meeting_link: str | None = None
     location: str | None = None
+    status_changed_at: datetime | None = None
+    status_history: list[dict[str, Any]] = Field(default_factory=list)
+    timeline: list[InterviewTimelineStep] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
 

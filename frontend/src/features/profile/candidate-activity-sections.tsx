@@ -11,6 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { InterviewTimeline } from "@/features/interviews/interview-timeline"
 import { useCandidateSync } from "@/features/candidate/candidate-sync-provider"
 import { APPLICATION_STATUS_LABELS } from "@/types/application"
 import { formatEmploymentType, formatJobDate } from "@/features/jobs/format"
@@ -242,18 +243,22 @@ export function CandidateActivitySections() {
           ) : (
             <ul className="divide-y divide-border">
               {interviews.slice(0, 5).map((item) => (
-                <li
-                  key={item.id}
-                  className="flex flex-col gap-1 py-2.5 sm:flex-row sm:items-center sm:justify-between"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate font-medium">{item.job_title ?? "Interview"}</p>
-                    <p className="truncate text-xs text-muted-foreground">
-                      {item.company_name ?? "Company"} · {formatWhen(item.scheduled_at)} ·{" "}
-                      {item.interview_type.replaceAll("_", " ")}
-                    </p>
+                <li key={item.id} className="space-y-3 py-3">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
+                      <p className="truncate font-medium">
+                        {item.job_title ?? "Interview"}
+                      </p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {item.company_name ?? "Company"} · {formatWhen(item.scheduled_at)} ·{" "}
+                        {item.interview_type.replaceAll("_", " ")}
+                      </p>
+                    </div>
+                    <StatusBadge status={item.status} />
                   </div>
-                  <StatusBadge status={item.status} />
+                  {item.timeline?.length ? (
+                    <InterviewTimeline steps={item.timeline} />
+                  ) : null}
                 </li>
               ))}
             </ul>

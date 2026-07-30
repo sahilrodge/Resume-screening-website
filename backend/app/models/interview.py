@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy import Enum as SAEnum
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import Base
@@ -60,6 +60,11 @@ class Interview(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     location: Mapped[str | None] = mapped_column(String(255), nullable=True)
     feedback: Mapped[str | None] = mapped_column(Text, nullable=True)
     rating: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    status_changed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    status_history: Mapped[list | None] = mapped_column(JSONB, nullable=True, default=list)
 
     application: Mapped[Application] = relationship("Application", back_populates="interviews")
     interviewer: Mapped[User | None] = relationship("User", back_populates="interviews_conducted")

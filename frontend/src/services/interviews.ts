@@ -2,24 +2,36 @@ import { apiClient } from "@/lib/api"
 
 export const INTERVIEW_STATUSES = [
   "scheduled",
+  "confirmed",
   "rescheduled",
   "in_progress",
   "completed",
   "selected",
   "rejected",
   "cancelled",
+  "no_show",
 ] as const
 
 export type InterviewStatus = (typeof INTERVIEW_STATUSES)[number]
 
 export const INTERVIEW_STATUS_LABELS: Record<InterviewStatus, string> = {
   scheduled: "Scheduled",
+  confirmed: "Confirmed",
   rescheduled: "Rescheduled",
   in_progress: "In Progress",
   completed: "Completed",
   selected: "Selected",
   rejected: "Rejected",
   cancelled: "Cancelled",
+  no_show: "No Show",
+}
+
+export type InterviewTimelineStep = {
+  key: string
+  label: string
+  completed: boolean
+  current: boolean
+  at: string | null
 }
 
 export type Interview = {
@@ -36,6 +48,9 @@ export type Interview = {
   duration_minutes: number
   meeting_link: string | null
   location: string | null
+  status_changed_at?: string | null
+  status_history?: { status: string; at: string }[]
+  timeline?: InterviewTimelineStep[]
   created_at: string
   updated_at: string
 }

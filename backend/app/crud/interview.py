@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session, joinedload
@@ -42,6 +44,7 @@ class CRUDInterview:
         location: str | None = None,
         interviewer_id: uuid.UUID | None = None,
     ) -> Interview:
+        now = datetime.now(UTC)
         interview = Interview(
             application_id=application_id,
             scheduled_at=scheduled_at,
@@ -51,6 +54,10 @@ class CRUDInterview:
             location=location,
             interviewer_id=interviewer_id,
             status=InterviewStatus.SCHEDULED,
+            status_changed_at=now,
+            status_history=[
+                {"status": InterviewStatus.SCHEDULED.value, "at": now.isoformat()}
+            ],
         )
         db.add(interview)
         db.commit()
@@ -108,7 +115,12 @@ class CRUDInterview:
         db_obj: Interview,
         status: InterviewStatus,
     ) -> Interview:
+        now = datetime.now(UTC)
+        history: list[Any] = list(db_obj.status_history or [])
+        history.append({"status": status.value, "at": now.isoformat()})
         db_obj.status = status
+        db_obj.status_changed_at = now
+        db_obj.status_history = history
         db.add(db_obj)
         db.commit()
         return self.get(db, db_obj.id)  # type: ignore[return-value]

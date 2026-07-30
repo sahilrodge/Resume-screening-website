@@ -25,6 +25,7 @@ import {
 import { Progress } from "@/components/ui/progress"
 import { useAuth } from "@/features/auth/auth-provider"
 import { useCandidateSync } from "@/features/candidate/candidate-sync-provider"
+import { InterviewTimeline } from "@/features/interviews/interview-timeline"
 import { APPLICATION_STATUS_LABELS } from "@/types/application"
 import { cn } from "@/lib/utils"
 
@@ -431,19 +432,22 @@ export default function PortalHomePage() {
                 </div>
                 <ul className="divide-y divide-border rounded-lg border border-border/60">
                   {interviews.slice(0, 4).map((item) => (
-                    <li
-                      key={item.id}
-                      className="flex items-start justify-between gap-3 px-3 py-2.5"
-                    >
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium">
-                          {item.job_title ?? "Interview"}
-                        </p>
-                        <p className="truncate text-xs text-muted-foreground">
-                          {item.company_name ?? "Company"} · {formatWhen(item.scheduled_at)}
-                        </p>
+                    <li key={item.id} className="space-y-3 px-3 py-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium">
+                            {item.job_title ?? "Interview"}
+                          </p>
+                          <p className="truncate text-xs text-muted-foreground">
+                            {item.company_name ?? "Company"} ·{" "}
+                            {formatWhen(item.scheduled_at)}
+                          </p>
+                        </div>
+                        <StatusBadge status={item.status} />
                       </div>
-                      <StatusBadge status={item.status} />
+                      {item.timeline?.length ? (
+                        <InterviewTimeline steps={item.timeline} />
+                      ) : null}
                     </li>
                   ))}
                 </ul>
