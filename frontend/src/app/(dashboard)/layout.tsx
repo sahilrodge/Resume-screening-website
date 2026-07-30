@@ -1,23 +1,35 @@
 "use client"
 
+import { useEffect } from "react"
+import { useRouter } from "next/navigation"
+
 import { AppNavbar } from "@/components/layout/app-navbar"
 import { AppSidebar } from "@/components/layout/app-sidebar"
 import { AuthLoading } from "@/components/shared/auth-loading"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { useAuth } from "@/features/auth/auth-provider"
+import { homeForRole } from "@/lib/auth-roles"
 
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  const router = useRouter()
   const { loading, isAuthenticated, user } = useAuth()
 
-  if (loading || !isAuthenticated) {
-    return <AuthLoading />
-  }
+  useEffect(() => {
+    if (loading) return
+    if (!isAuthenticated) {
+      router.replace("/login")
+      return
+    }
+    if (user?.role === "candidate") {
+      router.replace(homeForRole("candidate"))
+    }
+  }, [loading, isAuthenticated, user, router])
 
-  if (user?.role === "candidate") {
+  if (loading || !isAuthenticated || user?.role === "candidate") {
     return <AuthLoading />
   }
 

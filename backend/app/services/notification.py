@@ -49,6 +49,46 @@ DEFAULT_CHANNELS = (
 )
 
 
+def _frontend_base_url() -> str:
+    """Absolute app origin for email deep links."""
+    configured = (settings.FRONTEND_URL or "").strip().rstrip("/")
+    if configured:
+        return configured
+    for origin in settings.CORS_ORIGINS:
+        o = origin.strip().rstrip("/")
+        if not o:
+            continue
+        if "localhost" in o or "127.0.0.1" in o:
+            continue
+        return o
+    if settings.CORS_ORIGINS:
+        return settings.CORS_ORIGINS[0].strip().rstrip("/")
+    return ""
+
+
+def absolute_app_link(path: str | None) -> str | None:
+    """Turn an in-app path into an absolute URL when FRONTEND_URL/CORS allow it."""
+    if not path:
+        return None
+    if path.startswith("http://") or path.startswith("https://"):
+        return path
+    base = _frontend_base_url()
+    if not base:
+        return path
+    return f"{base}{path if path.startswith('/') else f'/{path}'}"
+
+
+def staff_application_path(application_id: uuid.UUID) -> str:
+    return f"/screening/{application_id}"
+
+
+def candidate_hiring_path(*, interview: Interview | None = None) -> str:
+    """Candidate-safe deep link (staff /screening/* is blocked by RBAC)."""
+    if interview is not None:
+        return "/portal"
+    return "/portal/screening"
+
+
 def _to_response(obj: Notification) -> NotificationResponse:
     return NotificationResponse.model_validate(obj)
 
@@ -292,7 +332,10 @@ class NotificationService:
         if interview is not None:
             meta["interview_id"] = str(interview.id)
 
-        href = link or f"/screening/{application.id}"
+        staff_href = link or staff_application_path(application.id)
+        if staff_href.startswith("/portal"):
+            staff_href = staff_application_path(application.id)
+        candidate_href = candidate_hiring_path(interview=interview)
 
         recruiter_user_id = None
         if application.job and application.job.recruiter and application.job.recruiter.user_id:
@@ -312,7 +355,7 @@ class NotificationService:
                     title=title,
                     message=message,
                     notification_type=notification_type,
-                    link=href,
+                    link=staff_href,
                     meta=meta,
                     channels=DEFAULT_CHANNELS,
                 )
@@ -337,7 +380,7 @@ class NotificationService:
                     title=title,
                     message=message,
                     notification_type=notification_type,
-                    link=href,
+                    link=staff_href,
                     meta=meta,
                     channels=[NotificationChannel.IN_APP],
                 )
@@ -352,7 +395,7 @@ class NotificationService:
                     title=title,
                     message=message,
                     notification_type=notification_type,
-                    link=href,
+                    link=candidate_href,
                     meta=meta,
                     channels=[
                         NotificationChannel.IN_APP,
@@ -382,13 +425,18 @@ class NotificationService:
         link: str | None,
         meta: dict[str, Any] | None,
     ) -> NotificationResponse:
+        email_link = absolute_app_link(link)
         result = send_email(
             to_email=user.email,
             subject=title,
-            body=message if not link else f"{message}\n\nOpen: {link}",
+            body=message if not email_link else f"{message}\n\nOpen: {email_link}",
             html_body=(
                 f"<p>{message}</p>"
-                + (f'<p><a href="{link}">Open in HirePulse</a></p>' if link else "")
+                + (
+                    f'<p><a href="{email_link}">Open in HirePulse</a></p>'
+                    if email_link
+                    else ""
+                )
             ),
         )
         if result.get("skipped"):

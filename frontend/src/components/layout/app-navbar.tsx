@@ -321,11 +321,15 @@ export function AppNavbar() {
     if (!item.is_read) {
       void onMarkRead(item.id)
     }
-    if (item.link) {
-      startTransition(() => {
-        router.push(item.link!)
-      })
+    if (!item.link) return
+    let href = item.link
+    // Legacy candidate alerts pointed at staff /screening/* (RBAC blocks those).
+    if (isCandidate && href.startsWith("/screening")) {
+      href = "/portal/screening"
     }
+    startTransition(() => {
+      router.push(href)
+    })
   }
 
   return (

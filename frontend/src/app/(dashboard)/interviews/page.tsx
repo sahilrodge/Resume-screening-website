@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { CalendarPlus, Video } from "lucide-react"
 
@@ -11,7 +11,7 @@ import { InlineAlert } from "@/components/shared/inline-alert"
 import { PageHeader } from "@/components/shared/page-header"
 import { PageSkeleton } from "@/components/shared/page-skeleton"
 import { useToast } from "@/components/shared/toast"
-import { buttonVariants } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import {
   Card,
   CardContent,
@@ -19,8 +19,18 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { InterviewTimeline } from "@/features/interviews/interview-timeline"
+import { applicationsApi } from "@/services/applications"
 import {
   INTERVIEW_STATUS_LABELS,
   INTERVIEW_STATUSES,
@@ -29,6 +39,8 @@ import {
   type InterviewStatus,
 } from "@/services/interviews"
 import { ApiError } from "@/types/api"
+import type { ApplicationMatch } from "@/types/application"
+import { APPLICATION_STATUS_LABELS } from "@/types/application"
 
 function formatWhen(iso: string) {
   try {
@@ -44,13 +56,23 @@ function formatWhen(iso: string) {
 export default function InterviewsPage() {
   const { toast } = useToast()
   const [items, setItems] = useState<Interview[]>([])
+  const [applicants, setApplicants] = useState<ApplicationMatch[]>([])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [scheduleOpen, setScheduleOpen] = useState(false)
+  const [scheduleBusy, setScheduleBusy] = useState(false)
+  const [applicationId, setApplicationId] = useState("")
+  const [interviewAt, setInterviewAt] = useState("")
+  const [meetingLink, setMeetingLink] = useState("")
 
   async function load() {
-    const res = await interviewsApi.list({ page_size: 50 })
-    setItems(res.items ?? [])
+    const [interviewsRes, appsRes] = await Promise.all([
+      interviewsApi.list({ page_size: 50 }),
+      applicationsApi.list({ page_size: 50, sort_by: "created_at", sort_order: "desc" }),
+    ])
+    setItems(interviewsRes.items ?? [])
+    setApplicants(appsRes.items ?? [])
   }
 
   useEffect(() => {
@@ -75,6 +97,15 @@ export default function InterviewsPage() {
       cancelled = true
     }
   }, [])
+
+  const schedulable = useMemo(() => {
+    return applicants.filter(
+      (app) =>
+        app.status !== "rejected" &&
+        app.status !== "withdrawn" &&
+        app.status !== "hired"
+    )
+  }, [applicants])
 
   async function setStatus(id: string, status: InterviewStatus) {
     const previous = items.find((item) => item.id === id)
@@ -108,6 +139,40 @@ export default function InterviewsPage() {
     }
   }
 
+  async function scheduleInterview() {
+    if (!applicationId) {
+      setError("Select an application to schedule")
+      return
+    }
+    if (!interviewAt) {
+      setError("Pick an interview date and time")
+      return
+    }
+    setScheduleBusy(true)
+    setError(null)
+    try {
+      const created = await interviewsApi.create({
+        application_id: applicationId,
+        scheduled_at: new Date(interviewAt).toISOString(),
+        meeting_link: meetingLink.trim() || undefined,
+        interview_type: "video",
+      })
+      setItems((current) => [created, ...current])
+      setScheduleOpen(false)
+      setApplicationId("")
+      setInterviewAt("")
+      setMeetingLink("")
+      toast("Interview scheduled successfully.", "success")
+    } catch (err) {
+      const message =
+        err instanceof ApiError ? err.message : "Could not schedule interview"
+      setError(message)
+      toast(message, "error")
+    } finally {
+      setScheduleBusy(false)
+    }
+  }
+
   return (
     <PageTransition>
       <FadeIn>
@@ -115,10 +180,10 @@ export default function InterviewsPage() {
           title="Interviews"
           description="Manage interview status, timeline, and outcomes for every candidate."
           actions={
-            <Link href="/screening" className={buttonVariants()}>
+            <Button type="button" onClick={() => setScheduleOpen(true)}>
               <CalendarPlus data-icon="inline-start" />
               Schedule
-            </Link>
+            </Button>
           }
         />
       </FadeIn>
@@ -131,11 +196,11 @@ export default function InterviewsPage() {
         <EmptyState
           icon={Video}
           title="No interviews scheduled"
-          description="Book interviews from screened applications to track status here."
+          description="Schedule from screened applications to track status here."
           action={
-            <Link href="/screening" className={buttonVariants()}>
-              Go to screening
-            </Link>
+            <Button type="button" onClick={() => setScheduleOpen(true)}>
+              Schedule interview
+            </Button>
           }
         />
       ) : null}
@@ -213,6 +278,84 @@ export default function InterviewsPage() {
           </FadeIn>
         ))}
       </div>
+
+      <Dialog open={scheduleOpen} onOpenChange={setScheduleOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Schedule interview</DialogTitle>
+            <DialogDescription>
+              Pick an application and time. The candidate will be notified when
+              delivery is configured.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3">
+            <div className="grid gap-2">
+              <Label htmlFor="schedule-application">Application</Label>
+              <select
+                id="schedule-application"
+                className="h-9 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm dark:bg-input/30"
+                value={applicationId}
+                onChange={(e) => setApplicationId(e.target.value)}
+              >
+                <option value="">Select application…</option>
+                {schedulable.map((app) => (
+                  <option key={app.id} value={app.id}>
+                    {(app.candidate_name || "Candidate") +
+                      " · " +
+                      (app.job_title || "Role") +
+                      " · " +
+                      (APPLICATION_STATUS_LABELS[app.status] || app.status)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="schedule-at">Date & time</Label>
+              <Input
+                id="schedule-at"
+                type="datetime-local"
+                value={interviewAt}
+                onChange={(e) => setInterviewAt(e.target.value)}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="schedule-link">Meeting link (optional)</Label>
+              <Input
+                id="schedule-link"
+                placeholder="https://meet.google.com/..."
+                value={meetingLink}
+                onChange={(e) => setMeetingLink(e.target.value)}
+              />
+            </div>
+            {!schedulable.length ? (
+              <p className="text-xs text-muted-foreground">
+                No applications available.{" "}
+                <Link href="/screening" className="text-primary hover:underline">
+                  Run screening first
+                </Link>
+                .
+              </p>
+            ) : null}
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={scheduleBusy}
+              onClick={() => setScheduleOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              disabled={scheduleBusy || !schedulable.length}
+              onClick={() => void scheduleInterview()}
+            >
+              {scheduleBusy ? "Scheduling…" : "Confirm schedule"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </PageTransition>
   )
 }

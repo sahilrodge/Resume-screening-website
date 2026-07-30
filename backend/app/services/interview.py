@@ -192,7 +192,6 @@ class InterviewService:
                 notification_type=NotificationType.SUCCESS,
                 event="interview_invite",
                 interview=created,
-                link=f"/screening/{created.application_id}",
                 notify_candidate=True,
             )
 
@@ -313,7 +312,6 @@ class InterviewService:
                 ),
                 event=f"interview_status_{data.status.value}",
                 interview=updated,
-                link=f"/screening/{updated.application_id}",
                 notify_candidate=True,
             )
 

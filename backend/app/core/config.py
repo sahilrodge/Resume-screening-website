@@ -126,6 +126,8 @@ class Settings(BaseSettings):
     LOCAL_UPLOAD_DIR: str = "uploads"
     # Optional absolute public API origin for local file URLs, e.g. http://127.0.0.1:8000
     PUBLIC_API_URL: str | None = None
+    # Absolute frontend origin for email deep links, e.g. https://hirepulse-gamma.vercel.app
+    FRONTEND_URL: str | None = None
 
     # Email (SMTP)
     SMTP_HOST: str | None = None

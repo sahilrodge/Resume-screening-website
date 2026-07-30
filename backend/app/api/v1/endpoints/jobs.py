@@ -7,9 +7,12 @@ from typing import Annotated
 
 from fastapi import APIRouter, Query, status
 
+from sqlalchemy import select
+
 from app.api.deps import CandidateUser, CurrentUser, DBSession, RecruiterUser
 from app.core.exceptions import ForbiddenError, NotFoundError
 from app.models.enums import EmploymentType, JobStatus, UserRole
+from app.models.recruiter import Recruiter
 from app.schemas.common import MessageResponse
 from app.schemas.job import (
     JobCreate,
@@ -49,9 +52,14 @@ def job_dashboard_stats(
 def create_job(
     payload: JobCreate,
     db: DBSession,
-    _: RecruiterUser,
+    current_user: RecruiterUser,
 ) -> JobResponse:
-    return job_service.create(db, data=payload)
+    data = payload
+    if data.recruiter_id is None:
+        rec = db.scalar(select(Recruiter).where(Recruiter.user_id == current_user.id))
+        if rec is not None:
+            data = payload.model_copy(update={"recruiter_id": rec.id})
+    return job_service.create(db, data=data)
 
 
 @router.get(
