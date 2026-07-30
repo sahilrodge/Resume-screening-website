@@ -1,10 +1,14 @@
 "use client"
 
-import { useEffect } from "react"
-import { createPortal } from "react-dom"
-
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { cn } from "@/lib/utils"
 
 type ConfirmDialogProps = {
   open: boolean
@@ -18,7 +22,11 @@ type ConfirmDialogProps = {
   onCancel: () => void
 }
 
-/** Portal-based confirm modal — avoids transform/z-index issues from page motion. */
+/**
+ * Controlled confirm modal built on the shared Dialog primitive.
+ * (Custom createPortal + full-screen backdrop was closing immediately on the
+ * same click that opened it in some browsers, so Select/Reject appeared dead.)
+ */
 export function ConfirmDialog({
   open,
   title,
@@ -30,58 +38,23 @@ export function ConfirmDialog({
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
-  useEffect(() => {
-    if (!open) return
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !busy) onCancel()
-    }
-    document.addEventListener("keydown", onKey)
-    const prev = document.body.style.overflow
-    document.body.style.overflow = "hidden"
-    return () => {
-      document.removeEventListener("keydown", onKey)
-      document.body.style.overflow = prev
-    }
-  }, [open, busy, onCancel])
-
-  if (!open || typeof document === "undefined") return null
-
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4"
-      role="presentation"
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next && !busy) onCancel()
+      }}
     >
-      <button
-        type="button"
-        aria-label="Dismiss dialog"
-        className="absolute inset-0 bg-black/45 supports-backdrop-filter:backdrop-blur-sm"
-        disabled={busy}
-        onClick={() => {
-          if (!busy) onCancel()
-        }}
-      />
-      <div
-        role="alertdialog"
-        aria-modal="true"
-        aria-labelledby="confirm-dialog-title"
-        aria-describedby="confirm-dialog-desc"
-        className={cn(
-          "relative z-[101] w-full max-w-md rounded-2xl border border-border bg-card p-5 text-card-foreground shadow-xl ring-1 ring-foreground/10"
-        )}
+      <DialogContent
+        showCloseButton={false}
+        className="sm:max-w-md"
+        initialFocus={false}
       >
-        <h2
-          id="confirm-dialog-title"
-          className="font-heading text-base font-semibold tracking-tight"
-        >
-          {title}
-        </h2>
-        <p
-          id="confirm-dialog-desc"
-          className="mt-2 text-sm leading-relaxed text-muted-foreground"
-        >
-          {description}
-        </p>
-        <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="gap-2 sm:gap-0">
           <Button
             type="button"
             variant="outline"
@@ -94,13 +67,16 @@ export function ConfirmDialog({
             type="button"
             variant={confirmVariant}
             disabled={busy}
-            onClick={onConfirm}
+            onClick={(event) => {
+              event.preventDefault()
+              event.stopPropagation()
+              onConfirm()
+            }}
           >
             {busy ? "Saving…" : confirmLabel}
           </Button>
-        </div>
-      </div>
-    </div>,
-    document.body
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

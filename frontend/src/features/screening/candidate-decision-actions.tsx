@@ -96,9 +96,13 @@ export function CandidateDecisionActions({
             rejected &&
               "bg-rose-600 text-white hover:bg-rose-600/90 disabled:opacity-100"
           )}
-          disabled={busy || selected}
-          onClick={() => {
-            if (!rejected) setConfirm("rejected")
+          disabled={busy || selected || rejected}
+          onClick={(event) => {
+            event.preventDefault()
+            event.stopPropagation()
+            if (busy || selected || rejected) return
+            // Defer open so the triggering click cannot dismiss the dialog.
+            window.setTimeout(() => setConfirm("rejected"), 0)
           }}
         >
           <XCircle className="size-4" />
@@ -110,9 +114,12 @@ export function CandidateDecisionActions({
             selected &&
               "bg-emerald-600 text-white hover:bg-emerald-600/90 disabled:opacity-100"
           )}
-          disabled={busy || rejected}
-          onClick={() => {
-            if (!selected) setConfirm("selected")
+          disabled={busy || selected || rejected}
+          onClick={(event) => {
+            event.preventDefault()
+            event.stopPropagation()
+            if (busy || selected || rejected) return
+            window.setTimeout(() => setConfirm("selected"), 0)
           }}
         >
           <CheckCircle2 className="size-4" />
