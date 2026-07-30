@@ -302,7 +302,11 @@ class ApplicationService:
             if data.status == ApplicationStatus.REJECTED:
                 ntype = NotificationType.WARNING
                 title = "Candidate rejected"
-            elif data.status in (ApplicationStatus.HIRED, ApplicationStatus.OFFERED):
+            elif data.status in (
+                ApplicationStatus.SELECTED,
+                ApplicationStatus.HIRED,
+                ApplicationStatus.OFFERED,
+            ):
                 ntype = NotificationType.SUCCESS
                 title = "Candidate selected"
             notification_service.notify_hiring_event(
@@ -315,6 +319,7 @@ class ApplicationService:
                 notify_candidate=data.status
                 in (
                     ApplicationStatus.REJECTED,
+                    ApplicationStatus.SELECTED,
                     ApplicationStatus.HIRED,
                     ApplicationStatus.OFFERED,
                     ApplicationStatus.INTERVIEW,

@@ -26,6 +26,7 @@ FUNNEL_ORDER = [
     ApplicationStatus.SHORTLISTED,
     ApplicationStatus.INTERVIEW,
     ApplicationStatus.OFFERED,
+    ApplicationStatus.SELECTED,
     ApplicationStatus.HIRED,
 ]
 
@@ -35,6 +36,7 @@ STATUS_LABELS = {
     ApplicationStatus.SHORTLISTED: "Shortlisted",
     ApplicationStatus.INTERVIEW: "Interview",
     ApplicationStatus.OFFERED: "Offered",
+    ApplicationStatus.SELECTED: "Selected",
     ApplicationStatus.HIRED: "Hired",
     ApplicationStatus.REJECTED: "Rejected",
     ApplicationStatus.WITHDRAWN: "Withdrawn",

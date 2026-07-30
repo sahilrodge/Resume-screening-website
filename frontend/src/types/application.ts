@@ -4,6 +4,7 @@ export type ApplicationStatus =
   | "shortlisted"
   | "interview"
   | "offered"
+  | "selected"
   | "rejected"
   | "hired"
   | "withdrawn"
@@ -53,6 +54,7 @@ export const APPLICATION_STATUS_LABELS: Record<ApplicationStatus, string> = {
   shortlisted: "Shortlisted",
   interview: "Interview",
   offered: "Offered",
+  selected: "Selected",
   rejected: "Rejected",
   hired: "Hired",
   withdrawn: "Withdrawn",

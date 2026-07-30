@@ -30,6 +30,7 @@ class ApplicationStatus(str, Enum):
     SHORTLISTED = "shortlisted"
     INTERVIEW = "interview"
     OFFERED = "offered"
+    SELECTED = "selected"
     REJECTED = "rejected"
     HIRED = "hired"
     WITHDRAWN = "withdrawn"

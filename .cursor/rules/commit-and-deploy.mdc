@@ -1,0 +1,19 @@
+---
+description: Always commit and deploy after completing user-requested work
+alwaysApply: true
+---
+
+# Commit and deploy after every completed task
+
+When you finish implementing work the user asked for in a prompt:
+
+1. **Commit** all related changes (never commit secrets like `.env`, credentials, or `backend/uploads/`).
+2. **Push** to `origin` on the current branch (`main` unless the user specified otherwise) so Railway (API) and Vercel (frontend) auto-deploy.
+3. Confirm briefly with the commit hash / that push succeeded.
+
+Do this by default at the end of each completed feature/fix prompt — the user does not need to ask again.
+
+Skip commit/deploy only if:
+
+- There were no code or config changes, or
+- The user explicitly said not to commit/deploy for that prompt.
