@@ -2,7 +2,6 @@
 
 import Link from "next/link"
 
-import { StatusBadge } from "@/components/admin/status-badge"
 import { buttonVariants } from "@/components/ui/button"
 import {
   Card,
