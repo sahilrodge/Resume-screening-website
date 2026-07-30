@@ -29,14 +29,12 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { InterviewStatusSelect } from "@/features/interviews/interview-status-select"
 import { InterviewTimeline } from "@/features/interviews/interview-timeline"
 import { applicationsApi } from "@/services/applications"
 import {
-  INTERVIEW_STATUS_LABELS,
-  INTERVIEW_STATUSES,
   interviewsApi,
   type Interview,
-  type InterviewStatus,
 } from "@/services/interviews"
 import { ApiError } from "@/types/api"
 import type { ApplicationMatch } from "@/types/application"
@@ -59,7 +57,6 @@ export default function InterviewsPage() {
   const [applicants, setApplicants] = useState<ApplicationMatch[]>([])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const [busyId, setBusyId] = useState<string | null>(null)
   const [scheduleOpen, setScheduleOpen] = useState(false)
   const [scheduleBusy, setScheduleBusy] = useState(false)
   const [applicationId, setApplicationId] = useState("")
@@ -106,38 +103,6 @@ export default function InterviewsPage() {
         app.status !== "hired"
     )
   }, [applicants])
-
-  async function setStatus(id: string, status: InterviewStatus) {
-    const previous = items.find((item) => item.id === id)
-    if (!previous || previous.status === status) return
-
-    setBusyId(id)
-    setError(null)
-    setItems((current) =>
-      current.map((item) => (item.id === id ? { ...item, status } : item))
-    )
-
-    try {
-      const updated = await interviewsApi.updateStatus(id, { status })
-      setItems((current) =>
-        current.map((item) => (item.id === id ? { ...item, ...updated } : item))
-      )
-      toast(
-        `Interview status updated to ${INTERVIEW_STATUS_LABELS[status]}.`,
-        "success"
-      )
-    } catch (err) {
-      setItems((current) =>
-        current.map((item) => (item.id === id ? previous : item))
-      )
-      const message =
-        err instanceof ApiError ? err.message : "Could not update interview"
-      setError(message)
-      toast(message, "error")
-    } finally {
-      setBusyId(null)
-    }
-  }
 
   async function scheduleInterview() {
     if (!applicationId) {
@@ -243,27 +208,17 @@ export default function InterviewsPage() {
               </CardHeader>
 
               <CardContent className="space-y-4">
-                <div className="grid gap-2 sm:max-w-xs">
-                  <Label htmlFor={`interview-status-${item.id}`}>Status</Label>
-                  <select
-                    id={`interview-status-${item.id}`}
-                    className="h-9 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none hover:border-ring/40 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-input/30"
-                    value={item.status}
-                    disabled={busyId === item.id}
-                    onChange={(event) => {
-                      void setStatus(
-                        item.id,
-                        event.target.value as InterviewStatus
+                <InterviewStatusSelect
+                  interview={item}
+                  showBadge={false}
+                  onUpdated={(updated) => {
+                    setItems((current) =>
+                      current.map((row) =>
+                        row.id === updated.id ? { ...row, ...updated } : row
                       )
-                    }}
-                  >
-                    {INTERVIEW_STATUSES.map((status) => (
-                      <option key={status} value={status}>
-                        {INTERVIEW_STATUS_LABELS[status]}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                    )
+                  }}
+                />
 
                 {item.timeline?.length ? (
                   <div className="rounded-xl border border-border/60 bg-background/50 p-3 sm:p-4">

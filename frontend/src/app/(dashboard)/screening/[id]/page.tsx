@@ -15,13 +15,26 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Skeleton } from "@/components/ui/skeleton"
 import { CandidateDecisionActions } from "@/features/screening/candidate-decision-actions"
+import { InterviewStatusSelect } from "@/features/interviews/interview-status-select"
+import { InterviewTimeline } from "@/features/interviews/interview-timeline"
 import { MatchResultPanel } from "@/features/screening/match-result-panel"
 import { useApiLoading } from "@/hooks/use-api-loading"
 import { applicationsApi } from "@/services/applications"
-import { interviewsApi } from "@/services/interviews"
+import { interviewsApi, type Interview } from "@/services/interviews"
 import { ApiError } from "@/types/api"
 import type { ApplicationMatch } from "@/types/application"
 import { APPLICATION_STATUS_LABELS } from "@/types/application"
+
+function formatWhen(iso: string) {
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(new Date(iso))
+  } catch {
+    return iso
+  }
+}
 
 export default function ScreeningDetailPage() {
   const params = useParams<{ id: string }>()
@@ -29,20 +42,34 @@ export default function ScreeningDetailPage() {
   const apiLoading = useApiLoading()
   const { toast } = useToast()
   const [result, setResult] = useState<ApplicationMatch | null>(null)
+  const [interviews, setInterviews] = useState<Interview[]>([])
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [interviewAt, setInterviewAt] = useState("")
   const [meetingLink, setMeetingLink] = useState("")
 
+  const loadInterviews = useCallback(async () => {
+    const data = await interviewsApi.list({
+      application_id: id,
+      page_size: 20,
+    })
+    setInterviews(data.items ?? [])
+  }, [id])
+
   const load = useCallback(async () => {
     setError(null)
     try {
-      const data = await applicationsApi.get(id)
+      const [data] = await Promise.all([
+        applicationsApi.get(id),
+        loadInterviews().catch(() => {
+          setInterviews([])
+        }),
+      ])
       setResult(data)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to load match result")
     }
-  }, [id])
+  }, [id, loadInterviews])
 
   useEffect(() => {
     void load()
@@ -56,13 +83,16 @@ export default function ScreeningDetailPage() {
     setBusy(true)
     setError(null)
     try {
-      await interviewsApi.create({
+      const created = await interviewsApi.create({
         application_id: id,
         scheduled_at: new Date(interviewAt).toISOString(),
         meeting_link: meetingLink.trim() || undefined,
         interview_type: "video",
       })
+      setInterviews((current) => [created, ...current])
       await load()
+      setInterviewAt("")
+      setMeetingLink("")
       toast("Interview scheduled successfully.", "success")
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to schedule interview")
@@ -160,36 +190,103 @@ export default function ScreeningDetailPage() {
                 onUpdated={setResult}
               />
 
-              <div className="grid gap-3 border-t border-border/60 pt-4 md:grid-cols-[1fr_1fr_auto]">
-                <div className="grid gap-2">
-                  <Label htmlFor="interviewAt">Interview time</Label>
-                  <Input
-                    id="interviewAt"
-                    type="datetime-local"
-                    value={interviewAt}
-                    onChange={(e) => setInterviewAt(e.target.value)}
-                    disabled={rejected}
-                  />
+              <div className="space-y-4 border-t border-border/60 pt-4">
+                <div>
+                  <h3 className="font-heading text-sm font-semibold">Interview</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Schedule an interview, then update status from the dropdown
+                    below. Changes save immediately.
+                  </p>
                 </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="meetingLink">Meeting link (optional)</Label>
-                  <Input
-                    id="meetingLink"
-                    placeholder="https://meet.google.com/..."
-                    value={meetingLink}
-                    onChange={(e) => setMeetingLink(e.target.value)}
-                    disabled={rejected}
-                  />
+
+                <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto]">
+                  <div className="grid gap-2">
+                    <Label htmlFor="interviewAt">Interview time</Label>
+                    <Input
+                      id="interviewAt"
+                      type="datetime-local"
+                      value={interviewAt}
+                      onChange={(e) => setInterviewAt(e.target.value)}
+                      disabled={rejected}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="meetingLink">Meeting link (optional)</Label>
+                    <Input
+                      id="meetingLink"
+                      placeholder="https://meet.google.com/..."
+                      value={meetingLink}
+                      onChange={(e) => setMeetingLink(e.target.value)}
+                      disabled={rejected}
+                    />
+                  </div>
+                  <div className="flex items-end">
+                    <Button
+                      disabled={busy || rejected}
+                      onClick={() => void inviteInterview()}
+                    >
+                      <CalendarPlus className="size-4" />
+                      Schedule interview
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex items-end">
-                  <Button
-                    disabled={busy || rejected}
-                    onClick={() => void inviteInterview()}
-                  >
-                    <CalendarPlus className="size-4" />
-                    Schedule interview
-                  </Button>
-                </div>
+
+                {interviews.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No interviews scheduled yet for this application.
+                  </p>
+                ) : (
+                  <ul className="space-y-3">
+                    {interviews.map((item) => (
+                      <li
+                        key={item.id}
+                        className="space-y-3 rounded-xl border border-border/60 bg-background/50 p-3 sm:p-4"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="min-w-0 text-sm">
+                            <p className="font-medium">
+                              {formatWhen(item.scheduled_at)}
+                              <span className="text-muted-foreground">
+                                {" "}
+                                · {item.duration_minutes} min
+                              </span>
+                            </p>
+                            <p className="text-xs text-muted-foreground capitalize">
+                              {item.interview_type}
+                              {item.meeting_link ? " · meeting link set" : ""}
+                            </p>
+                          </div>
+                          <StatusBadge status={item.status} />
+                        </div>
+
+                        <InterviewStatusSelect
+                          interview={item}
+                          showBadge={false}
+                          onUpdated={(updated) => {
+                            setInterviews((current) =>
+                              current.map((row) =>
+                                row.id === updated.id
+                                  ? { ...row, ...updated }
+                                  : row
+                              )
+                            )
+                          }}
+                        />
+
+                        {item.timeline?.length ? (
+                          <InterviewTimeline steps={item.timeline} />
+                        ) : null}
+
+                        <Link
+                          href="/interviews"
+                          className="text-xs text-primary hover:underline"
+                        >
+                          Open Interviews
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             </section>
           </FadeIn>
